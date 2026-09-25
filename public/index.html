@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agricrowd.uz — sabzavot loyihalarini moliyalashtirish platformasi</title>
+  <meta name="description" content="Agricrowd.uz — O'zbekistonda sabzavot yetishtiruvchi fermer va dehqon xo'jaliklarini investorlar mablag'i orqali moliyalashtiruvchi kraudfanding platformasi." />
+  <meta name="theme-color" content="#1f6f43" />
+  <link rel="icon" href="/img/logo.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#/" class="logo" aria-label="Agricrowd.uz bosh sahifa">
+        <img src="/img/logo.svg" alt="" width="34" height="34" />
+        <span>Agricrowd<b>.uz</b></span>
+      </a>
+      <button class="nav-toggle" aria-label="Menyu" aria-expanded="false">☰</button>
+      <nav class="main-nav" id="main-nav">
+        <a href="#/" data-nav="home">Bosh sahifa</a>
+        <a href="#/projects" data-nav="projects">Loyihalar</a>
+        <a href="#/investor" data-nav="investor">Investor bo'lish</a>
+        <a href="#/farmer" data-nav="farmer">Loyiha joylashtirish</a>
+        <a href="#/how" data-nav="how">Qanday ishlaydi?</a>
+        <span class="nav-auth" id="nav-auth"></span>
+      </nav>
+    </div>
+  </header>
+  <div id="demo-banner" class="demo-banner" hidden></div>
+  <main id="app" tabindex="-1"><div class="loader">Yuklanmoqda…</div></main>
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div>
+        <a href="#/" class="logo logo-light"><img src="/img/logo.svg" alt="" width="30" height="30" /><span>Agricrowd<b>.uz</b></span></a>
+        <p>Sabzavot yetishtirish loyihalarini moliyalashtirish platformasi. Fermer — loyiha va mahsulot, investor — moliyaviy resurs, Agricrowd.uz — ularni bog'lash, tekshirish va monitoring.</p>
+      </div>
+      <div>
+        <h4>Platforma</h4>
+        <a href="#/projects">Loyihalar</a>
+        <a href="#/how">Qanday ishlaydi?</a>
+        <a href="#/investor">Investorlarga</a>
+        <a href="#/farmer">Fermerlarga</a>
+      </div>
+      <div>
+        <h4>Aloqa</h4>
+        <span id="footer-phone"></span>
+        <span id="footer-email"></span>
+        <span>Toshkent, O'zbekiston</span>
+      </div>
+    </div>
+    <div class="container footer-bottom">© <span id="year"></span> Agricrowd.uz. Barcha huquqlar himoyalangan.</div>
+  </footer>
+  <div id="modal-root"></div>
+  <div id="toast-root" aria-live="polite"></div>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 // Umumiy UI yordamchilari
-import { STATUSES } from "./core.js";
+import { STATUSES, CONTRACT_STATUSES, PAYMENT_STATUSES, WITHDRAWAL_STATUSES } from "./core.js";
+import { t, tv, tc, formatDate } from "./i18n.js";
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -7,42 +8,39 @@ export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 export function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+// Tarjima + HTML-xavfsiz
+export const te = (key, params) => esc(t(key, params));
 
-export const num = (n) => Math.round(Number(n) || 0).toLocaleString("ru-RU").replace(/,/g, " ");
-export const money = (n) => `${num(n)} so'm`;
+export const num = (n) => Math.round(Number(n) || 0).toLocaleString("ru-RU").replace(/[,  ]/g, " ");
+export const money = (n) => `${num(n)} ${t("so'm")}`;
 export function short(n) {
   n = Number(n) || 0;
-  if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(1).replace(".0", "")} mlrd so'm`;
-  if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(1).replace(".0", "")} mln so'm`;
+  const f = (x) => x.toFixed(1).replace(".0", "");
+  if (Math.abs(n) >= 1e9) return t("{n} mlrd so'm", { n: f(n / 1e9) });
+  if (Math.abs(n) >= 1e6) return t("{n} mln so'm", { n: f(n / 1e6) });
   return money(n);
 }
-const MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentyabr", "oktyabr", "noyabr", "dekabr"];
-export function date(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d)) return esc(iso);
-  return `${d.getDate()}-${MONTHS[d.getMonth()]}, ${d.getFullYear()}`;
-}
-export function dateTime(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return `${date(iso)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
+export const date = (iso) => esc(formatDate(iso));
+export const dateTime = (iso) => esc(formatDate(iso, true));
 export function daysLeft(deadline) {
   if (!deadline) return null;
-  const diff = Math.ceil((new Date(deadline + "T23:59:59") - Date.now()) / 864e5);
-  return diff;
+  return Math.ceil((new Date(deadline + "T23:59:59") - Date.now()) / 864e5);
 }
 
-export function statusBadge(status) {
-  const s = STATUSES[status] || { label: status, tone: "info" };
-  return `<span class="badge tone-${s.tone}">${esc(s.label)}</span>`;
-}
+const badge = (map, status) => {
+  const s = map[status] || { label: status, tone: "info" };
+  return `<span class="badge tone-${s.tone}">${te(s.label)}</span>`;
+};
+export const statusBadge = (s) => badge(STATUSES, s);
+export const contractBadge = (s) => badge(CONTRACT_STATUSES, s);
+export const paymentBadge = (s) => badge(PAYMENT_STATUSES, s);
+export const withdrawalBadge = (s) => badge(WITHDRAWAL_STATUSES, s);
 
 const CROP_ICONS = { Pomidor: "🍅", Bodring: "🥒", Kartoshka: "🥔", Piyoz: "🧅", Sabzi: "🥕", Karam: "🥬", Qalampir: "🌶️", Baqlajon: "🍆", Sarimsoq: "🧄", Lavlagi: "🟣", Qovoq: "🎃" };
 const CROP_BG = { Pomidor: "#fde2dc", Bodring: "#dcf3e0", Kartoshka: "#f3ead9", Piyoz: "#f6e6f0", Sabzi: "#fde8d4", Karam: "#e3f4d9", Qalampir: "#fbdcdc", Baqlajon: "#ebe3f6" };
 export const cropIcon = (c) => CROP_ICONS[c] || "🌱";
 export const cropBg = (c) => CROP_BG[c] || "#e3f4e9";
+export const place = (p) => esc(tv(p.region)) + (p.district ? ", " + esc(tc(p.district)) : "");
 
 export function cover(p, extra = "", cls = "project-cover") {
   const style = p.image ? `background-image:url('${esc(p.image)}')` : `background:${cropBg(p.crop)}`;
@@ -52,10 +50,10 @@ export function cover(p, extra = "", cls = "project-cover") {
 export function progress(p) {
   const pct = p.percent ?? (p.goal ? Math.min(100, (p.raised / p.goal) * 100) : 0);
   return `<div class="progress ${pct >= 100 ? "full" : ""}" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></div>
-    <div class="progress-row"><span><b>${short(p.raised)}</b> yig'ildi</span><span><b>${Math.round(pct * 10) / 10}%</b> / ${short(p.goal)}</span></div>`;
+    <div class="progress-row"><span>${te("{amount} yig'ildi", { amount: short(p.raised) }).replace(esc(short(p.raised)), `<b>${esc(short(p.raised))}</b>`)}</span><span><b>${Math.round(pct * 10) / 10}%</b> / ${esc(short(p.goal))}</span></div>`;
 }
 
-export const stars = (r) => (r == null ? '<span class="muted">baholanmagan</span>' : `<span class="rating" title="${r} / 5">${"★".repeat(Math.round(r))}${"☆".repeat(5 - Math.round(r))}</span> <b>${Number(r).toFixed(1)}</b>`);
+export const stars = (r) => (r == null ? `<span class="muted">${te("baholanmagan")}</span>` : `<span class="rating" title="${r} / 5">${"★".repeat(Math.round(r))}${"☆".repeat(5 - Math.round(r))}</span> <b>${Number(r).toFixed(1)}</b>`);
 
 // --- Toast ---
 export function toast(msg, type = "ok") {
@@ -63,6 +61,7 @@ export function toast(msg, type = "ok") {
   el.className = `toast ${type}`;
   el.textContent = msg;
   $("#toast-root").append(el);
+  while ($("#toast-root").children.length > 3) $("#toast-root").firstChild.remove();
   setTimeout(() => el.remove(), 4000);
 }
 
@@ -72,7 +71,7 @@ export function modal({ title, body, wide = false, onMount }) {
   const wrap = document.createElement("div");
   wrap.className = "modal-backdrop";
   wrap.innerHTML = `<div class="modal ${wide ? "wide" : ""}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-    <div class="modal-head"><h3>${esc(title)}</h3><button class="modal-close" aria-label="Yopish">×</button></div>
+    <div class="modal-head"><h3>${esc(title)}</h3><button class="modal-close" aria-label="${te("Yopish")}">×</button></div>
     <div class="modal-body">${body}</div></div>`;
   const close = () => { wrap.remove(); document.removeEventListener("keydown", onKey); };
   const onKey = (e) => e.key === "Escape" && close();
@@ -82,15 +81,15 @@ export function modal({ title, body, wide = false, onMount }) {
   root.append(wrap);
   const m = $(".modal", wrap);
   onMount?.(m, close);
-  $("input, select, textarea", m)?.focus();
+  $("input:not([type=hidden]), select, textarea", m)?.focus();
   return close;
 }
 
-export function confirmDlg(text, { ok = "Tasdiqlash", danger = false } = {}) {
+export function confirmDlg(text, { ok = t("Tasdiqlash"), danger = false } = {}) {
   return new Promise((resolve) => {
     modal({
-      title: "Tasdiqlang",
-      body: `<p>${text}</p><div class="row" style="justify-content:flex-end"><button class="btn btn-ghost" data-no>Bekor qilish</button><button class="btn ${danger ? "btn-danger" : ""}" data-yes>${esc(ok)}</button></div>`,
+      title: t("Tasdiqlang"),
+      body: `<p>${esc(text)}</p><div class="row" style="justify-content:flex-end"><button class="btn btn-ghost" data-no>${te("Bekor qilish")}</button><button class="btn ${danger ? "btn-danger" : ""}" data-yes>${esc(ok)}</button></div>`,
       onMount(m, c) {
         $("[data-no]", m).onclick = () => { c(); resolve(false); };
         $("[data-yes]", m).onclick = () => { c(); resolve(true); };
@@ -107,26 +106,35 @@ export function formData(form) {
     if (!el.name || el.disabled) continue;
     if (el.type === "checkbox") out[el.name] = el.checked;
     else if (el.type === "number") out[el.name] = el.value === "" ? "" : Number(el.value);
+    else if (el.type === "file") continue;
     else out[el.name] = el.value;
   }
   return out;
 }
 
-// Tugmani "yuklanmoqda" holatiga o'tkazib, amalni bajarish
+// Tugmani "kuting" holatiga o'tkazib, amalni bajarish
 export async function busy(btn, fn) {
-  const text = btn?.innerHTML;
-  if (btn) { btn.disabled = true; btn.innerHTML = "Kuting…"; }
+  const html = btn?.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = te("Kuting…"); }
   try {
     return await fn();
   } finally {
-    if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = text; }
+    if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = html; }
   }
+}
+
+export function showFormError(form, msg) {
+  const box = $("[data-error]", form);
+  if (!box) return toast(msg, "err");
+  box.textContent = msg;
+  box.hidden = false;
+  box.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 // Rasmni siqib, data URL ko'rinishida qaytaradi
 export function compressImage(file, maxSize = 1280, quality = 0.72) {
   return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) return reject(new Error("Faqat rasm fayllari"));
+    if (!file.type.startsWith("image/")) return reject(new Error(t("Faqat rasm fayllari")));
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
@@ -138,7 +146,7 @@ export function compressImage(file, maxSize = 1280, quality = 0.72) {
       URL.revokeObjectURL(url);
       resolve(c.toDataURL("image/jpeg", quality));
     };
-    img.onerror = () => reject(new Error("Rasmni o'qib bo'lmadi"));
+    img.onerror = () => reject(new Error(t("Rasmni o'qib bo'lmadi")));
     img.src = url;
   });
 }
@@ -148,25 +156,25 @@ export function videoEmbed(url) {
   const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/);
   if (yt) return `<div class="video-wrap"><iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}" title="Video" allowfullscreen loading="lazy"></iframe></div>`;
   if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return `<div class="video-wrap"><video src="${esc(url)}" controls preload="metadata"></video></div>`;
-  if (/^https?:\/\//.test(url)) return `<p class="mt-1"><a href="${esc(url)}" target="_blank" rel="noopener">▶ Videoni ko'rish</a></p>`;
+  if (/^https?:\/\//.test(url)) return `<p class="mt-1"><a href="${esc(url)}" target="_blank" rel="noopener">▶ ${te("Videoni ko'rish")}</a></p>`;
   return "";
 }
 
 export function showImage(src) {
-  modal({ title: "Rasm", wide: true, body: `<img src="${esc(src)}" alt="" style="width:100%;border-radius:12px" />` });
+  modal({ title: t("Rasm"), wide: true, body: `<img src="${esc(src)}" alt="" style="width:100%;border-radius:12px" />` });
 }
 
 // Monitoring lentasi
 export function timeline(updates, { canDelete = false } = {}) {
-  if (!updates?.length) return `<div class="empty"><div class="ico">📷</div><p>Hozircha monitoring ma'lumotlari yo'q.</p></div>`;
+  if (!updates?.length) return `<div class="empty"><div class="ico">📷</div><p>${te("Hozircha monitoring ma'lumotlari yo'q.")}</p></div>`;
   return `<div class="timeline">${updates.map((u) => `
     <div class="tl-item">
-      <div class="when">${dateTime(u.createdAt)} ${u.stage ? `· <b>${esc(u.stage)}</b>` : ""} · ${u.authorRole === "admin" ? "Agricrowd.uz" : "Fermer"}</div>
-      <h4 class="mt-1 mb-0">${esc(u.title)}</h4>
-      ${u.text ? `<p class="mt-1 mb-0">${esc(u.text)}</p>` : ""}
-      ${Array.isArray(u.images) && u.images.length ? `<div class="tl-media">${u.images.map((src) => `<img src="${esc(src)}" alt="Monitoring surati" loading="lazy" data-zoom />`).join("")}</div>` : ""}
+      <div class="when">${dateTime(u.createdAt)} ${u.stage ? `· <b>${esc(tv(u.stage))}</b>` : ""} · ${u.authorRole === "admin" ? "Agricrowd.uz" : te("Fermer")}</div>
+      <h4 class="mt-1 mb-0">${esc(tc(u.title))}</h4>
+      ${u.text ? `<p class="mt-1 mb-0">${esc(tc(u.text))}</p>` : ""}
+      ${Array.isArray(u.images) && u.images.length ? `<div class="tl-media">${u.images.map((src) => `<img src="${esc(src)}" alt="" loading="lazy" data-zoom />`).join("")}</div>` : ""}
       ${videoEmbed(u.video)}
-      ${canDelete ? `<button class="btn btn-sm btn-ghost mt-1" data-del-update="${u.id}">🗑 O'chirish</button>` : ""}
+      ${canDelete ? `<button class="btn btn-sm btn-ghost mt-1" data-del-update="${u.id}">🗑 ${te("O'chirish")}</button>` : ""}
     </div>`).join("")}</div>`;
 }
 
@@ -177,12 +185,12 @@ export function statusTrack(status) {
   const idx = TRACK.indexOf(status);
   if (idx < 0) return "";
   return `<div class="status-track">${TRACK.map((_, i) => `<span class="${i <= idx ? "on" : ""}"></span>`).join("")}</div>
-    <div class="status-labels">${TRACK_LABELS.map((l) => `<span>${l}</span>`).join("")}</div>`;
+    <div class="status-labels">${TRACK_LABELS.map((l) => `<span>${te(l)}</span>`).join("")}</div>`;
 }
 
 // --- Oddiy grafiklar (bitta rang, hover'da tooltip) ---
 export function barList(items, { value = (x) => x.value, label = (x) => x.name, format = short } = {}) {
-  if (!items.length) return `<p class="muted">Ma'lumot yo'q</p>`;
+  if (!items.length) return `<p class="muted">${te("Ma'lumot yo'q")}</p>`;
   const max = Math.max(...items.map(value), 1);
   return `<div class="bars">${items.map((it) => `
     <div class="bar-row" data-tip="${esc(label(it))}: ${esc(format(value(it)))}">
@@ -199,15 +207,17 @@ export function columnChart(items, { value, label, tip }) {
 }
 
 let tipEl;
-document.addEventListener("mouseover", (e) => {
-  const t = e.target.closest?.("[data-tip]");
-  if (!t) { tipEl?.remove(); tipEl = null; return; }
-  if (!tipEl) { tipEl = document.createElement("div"); tipEl.className = "tip"; document.body.append(tipEl); }
-  tipEl.textContent = t.dataset.tip;
-});
-document.addEventListener("mousemove", (e) => {
-  if (tipEl) { tipEl.style.left = Math.min(e.clientX + 12, innerWidth - tipEl.offsetWidth - 8) + "px"; tipEl.style.top = e.clientY + 14 + "px"; }
-});
+if (globalThis.document) {
+  document.addEventListener("mouseover", (e) => {
+    const tg = e.target.closest?.("[data-tip]");
+    if (!tg) { tipEl?.remove(); tipEl = null; return; }
+    if (!tipEl) { tipEl = document.createElement("div"); tipEl.className = "tip"; document.body.append(tipEl); }
+    tipEl.textContent = tg.dataset.tip;
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (tipEl) { tipEl.style.left = Math.min(e.clientX + 12, innerWidth - tipEl.offsetWidth - 8) + "px"; tipEl.style.top = e.clientY + 14 + "px"; }
+  });
+}
 
 export function toCSV(rows, columns) {
   const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -220,3 +230,6 @@ export function download(name, text, type = "text/csv;charset=utf-8") {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+// Fayl nomi/hajmi
+export const fileSize = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);

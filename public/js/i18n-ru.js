@@ -995,6 +995,7 @@ export default {
 "Payme orqali to'lov": "Оплата через Payme",
 "Click orqali to'lov": "Оплата через Click",
 "To'lov bekor qilindi (Payme)": "Платёж отменён (Payme)",
+"Bosh sahifada statistikani ko'rsatish (loyihalar soni, jalb qilingan mablag', investorlar)": "Показывать статистику на главной (число проектов, привлечённые средства, инвесторы)",
 "Payme": "Payme",
 "Click": "Click"
 };

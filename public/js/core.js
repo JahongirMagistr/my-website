@@ -47,6 +47,7 @@ export const DEFAULT_HERO_IMAGE = "https://images.unsplash.com/photo-14884597167
 export const DEFAULT_SETTINGS = {
   commission: 5, // platforma komissiyasi, investorlar ulushidan %
   minInvestment: 500000,
+  showStats: true, // bosh sahifada statistika ko'rsatilsinmi
   testPayments: false, // test rejimida hisob darhol to'ldiriladi (haqiqiy pulsiz)
   regions: [
     "Andijon", "Buxoro", "Farg'ona", "Jizzax", "Xorazm", "Namangan", "Navoiy",
@@ -1203,6 +1204,7 @@ const ACTIONS = {
     if ("commission" in payload) s.commission = Math.max(0, Math.min(50, Number(payload.commission) || 0));
     if ("minInvestment" in payload) s.minInvestment = Math.max(1000, round(payload.minInvestment));
     if ("testPayments" in payload) s.testPayments = !!payload.testPayments;
+    if ("showStats" in payload) s.showStats = !!payload.showStats;
     for (const k of ["contactPhone", "contactEmail", "address", "telegram"]) if (k in payload) s[k] = str(payload[k], 300);
     if ("heroImage" in payload) s.heroImage = safeImg(payload.heroImage);
     if (payload.bank) s.bank = { ...s.bank, ...Object.fromEntries(Object.entries(payload.bank).map(([k, v]) => [k, str(v, 300)])) };

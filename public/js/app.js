@@ -292,12 +292,12 @@ async function pageHome() {
     </div>
   </section>
 
-  <div class="container stats-bar"><div class="stats-grid">
+  ${s.showStats !== false ? `  <div class="container stats-bar"><div class="stats-grid">
     <div><div class="stat-value">${num(stats.projects)}</div><div class="stat-label">${te("E'lon qilingan loyihalar")}</div></div>
     <div><div class="stat-value">${esc(short(stats.totalRaised))}</div><div class="stat-label">${te("Jalb qilingan mablag'")}</div></div>
     <div><div class="stat-value">${num(stats.investors)}</div><div class="stat-label">${te("Investorlar")}</div></div>
     <div><div class="stat-value">${num(stats.farmers)}</div><div class="stat-label">${te("Fermer va dehqonlar")}</div></div>
-  </div></div>
+  </div></div>` : `<div class="stats-spacer"></div>`}
 
   <section class="section"><div class="container">
     <div class="section-head"><div><h2>${te("Moliyalashtirilayotgan loyihalar")}</h2><p>${te("Administrator tomonidan tekshirilib, tasdiqlangan sabzavot yetishtirish loyihalari.")}</p></div><a class="btn btn-outline" href="#/projects">${te("Barcha loyihalar")} →</a></div>
@@ -670,12 +670,12 @@ async function pageAbout() {
   <section class="section"><div class="container grid grid-2" style="align-items:start">
     <div class="card article">${esc(contentText(s.content, "about")).split(/\n{2,}/).map((x) => `<p>${x.replace(/\n/g, "<br/>")}</p>`).join("")}</div>
     <div>
-      <div class="kpis">
+      ${s.showStats !== false ? `      <div class="kpis">
         <div class="kpi accent"><div class="v">${num(stats.projects)}</div><div class="l">${te("E'lon qilingan loyihalar")}</div></div>
         <div class="kpi"><div class="v">${esc(short(stats.totalRaised))}</div><div class="l">${te("Jalb qilingan mablag'")}</div></div>
         <div class="kpi"><div class="v">${num(stats.investors)}</div><div class="l">${te("Investorlar")}</div></div>
         <div class="kpi"><div class="v">${num(stats.farmers)}</div><div class="l">${te("Fermer va dehqonlar")}</div></div>
-      </div>
+      </div>` : ""}
       <div class="card mt-2"><h3>${te("Aloqa")}</h3>
         <p class="mb-0">☎ <a href="tel:${esc(s.contactPhone?.replace(/\s/g, ""))}">${esc(s.contactPhone)}</a><br/>✉ <a href="mailto:${esc(s.contactEmail)}">${esc(s.contactEmail)}</a><br/>📍 ${esc(tc(s.address))}</p>
         <a class="btn mt-2" href="#/contact">${te("Biz bilan bog'lanish")}</a>

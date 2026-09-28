@@ -415,6 +415,7 @@ const VIEWS = {
       <div class="form-section"><h3>${te("Moliyaviy shartlar")}</h3><div class="form-grid">
         <label class="field">${te("Platforma komissiyasi (investorlar ulushidan, %)")}<input name="commission" type="number" min="0" max="50" step="any" value="${esc(s.commission)}" /></label>
         <label class="field">${te("Minimal investitsiya (so'm)")}<input name="minInvestment" type="number" min="1000" step="any" value="${esc(s.minInvestment)}" /></label>
+        <label class="check full"><input type="checkbox" name="showStats" ${s.showStats !== false ? "checked" : ""} /> ${te("Bosh sahifada statistikani ko'rsatish (loyihalar soni, jalb qilingan mablag', investorlar)")}</label>
         <label class="check full"><input type="checkbox" name="testPayments" ${s.testPayments ? "checked" : ""} /> ${te("Test to'lov rejimi (hisob haqiqiy pulsiz to'ldiriladi — faqat sinov uchun!)")}</label>
       </div></div>
 
@@ -468,7 +469,7 @@ const VIEWS = {
     form.onsubmit = (e) => {
       e.preventDefault();
       const d = formData(form);
-      const payload = { commission: d.commission, minInvestment: d.minInvestment, testPayments: d.testPayments, heroImage: d.heroImage, contactPhone: d.contactPhone, contactEmail: d.contactEmail, address: d.address, telegram: d.telegram, regions: d.regions, crops: d.crops, bank: {}, content: { uz: {}, ru: {}, en: {} } };
+      const payload = { commission: d.commission, minInvestment: d.minInvestment, testPayments: d.testPayments, showStats: d.showStats, heroImage: d.heroImage, contactPhone: d.contactPhone, contactEmail: d.contactEmail, address: d.address, telegram: d.telegram, regions: d.regions, crops: d.crops, bank: {}, content: { uz: {}, ru: {}, en: {} } };
       for (const [k, v] of Object.entries(d)) {
         if (k.startsWith("bank_")) payload.bank[k.slice(5)] = v;
         const m = k.match(/^c_(uz|ru|en)_(\w+)$/);

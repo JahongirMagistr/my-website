@@ -9,7 +9,7 @@ import {
 } from "./ui.js";
 import { projectFormHtml, bindProjectForm, readProjectForm } from "./forms.js";
 import { state, app, go, requireRole, refreshBoot } from "./state.js";
-import { kpi, TX_LABELS, methodName, bindUpdateForm, printAnnex } from "./cabinet.js";
+import { kpi, TX_LABELS, methodName, bindUpdateForm, printAnnex, docsModal } from "./cabinet.js";
 
 let data = null;
 const userName = (id) => data.users.find((u) => u.id === id)?.name || (id ? "—" : "Agricrowd.uz");
@@ -126,6 +126,7 @@ const VIEWS = {
           <div><b>${te("Kafolat")}:</b> ${esc(tc(p.guarantee)) || "—"}</div>
           <div><b>${te("Hujjatlar")}:</b> ${esc(tc(p.documents)) || "—"}</div>
         </div>
+        <div class="row mt-2"><b class="small">📁 ${te("Yuklangan hujjatlar")}:</b> ${(p.docs || []).map((d) => openBtn(d, d.title || d.name)).join(" ") || `<span class="small" style="color:var(--red)">${te("Hozircha hujjat yuklanmagan")}</span>`}</div>
         <label class="field mt-2">${te("Izoh (fermerga ko'rinadi)")}<textarea data-note="${p.id}" style="min-height:60px">${esc(p.adminNote)}</textarea></label>
         <div class="row mt-2">
           <button class="btn" data-approve="${p.id}">✅ ${te("Tasdiqlash va e'lon qilish")}</button>
@@ -140,6 +141,7 @@ const VIEWS = {
       run(b, () => api("reviewProject", { id: b.dataset.reject, decision: "reject", note: note(b.dataset.reject) }), "Loyiha rad etildi");
     }));
     $$("[data-edit]", el).forEach((b) => (b.onclick = () => editProject(b.dataset.edit)));
+    bindOpen(el);
   },
 
   // --- Loyihalar ----------------------------------------------------------
@@ -221,6 +223,12 @@ const VIEWS = {
     const m = state.boot?.paymentMethods || {};
     el.innerHTML = `<h2>${te("To'lovlar")}</h2>
       <div class="pay-status mb-2">${[["Payme", m.payme], ["Click", m.click], ["Uzum Bank", m.uzum], [t("Bank o'tkazmasi"), m.bank], [t("Test to'lov"), m.test]].map(([n, on]) => `<span class="badge ${on ? "tone-good" : "tone-warn"}">${esc(n)}: ${te(on ? "ulangan" : "ulanmagan")}</span>`).join("")}</div>
+      <details class="card-flat mb-2"><summary><b>${te("Payme / Click ulash uchun ma'lumot")}</summary>
+        <p class="small mt-1">${te("To'lov tizimi kabinetida quyidagi manzillarni ko'rsating, so'ng kalitlarni Netlify muhit o'zgaruvchilariga kiriting (README'dagi 8-bosqich).")}</p>
+        <table class="detail-table small"><tr><th>Payme — Endpoint URL</th><td><code>${esc(location.origin)}/api/payme</code></td></tr>
+          <tr><th>Payme — ${te("hisob maydoni")}</th><td><code>order_id</code></td></tr>
+          <tr><th>Click — Prepare URL</th><td><code>${esc(location.origin)}/api/click</code></td></tr>
+          <tr><th>Click — Complete URL</th><td><code>${esc(location.origin)}/api/click</code></td></tr></table></details>
       <div class="row between"><h3 class="mb-0">${te("Hisobni to'ldirish")}</h3><div class="row" data-actions><select data-st><option value="">${te("Barchasi")}</option>${Object.entries(PAYMENT_STATUSES).map(([k, v]) => `<option value="${k}" ${k === "review" ? "selected" : ""}>${te(v.label)}</option>`).join("")}</select></div></div>
       <div class="table-wrap mt-2"><table class="data"><thead><tr><th>${te("Sana")}</th><th>${te("Investor")}</th><th>${te("Usul")}</th><th class="num">${te("Summa")}</th><th>${te("Chek")}</th><th>${te("Holat")}</th><th></th></tr></thead><tbody data-rows></tbody></table></div>
       <h3 class="mt-4">${te("Mablag' yechish so'rovlari")}</h3>
@@ -439,9 +447,14 @@ const VIEWS = {
         <label class="field">${te("Hududlar")} <small>(${te("har biri yangi qatorda")})</small><textarea name="regions" style="min-height:220px">${esc(s.regions.join("\n"))}</textarea></label>
         <label class="field">${te("Sabzavot mahsulotlari")} <small>(${te("har biri yangi qatorda")})</small><textarea name="crops" style="min-height:220px">${esc(s.crops.join("\n"))}</textarea></label></div></div>
       <div class="error-box" data-error hidden></div><div><button class="btn btn-lg">${te("Saqlash")}</button></div></form></div>
+      <div class="card mt-3"><h3>✈️ ${te("Telegram bot")}</h3>
+        ${state.boot?.features?.telegram ? `<p class="small">${te("Bot ulangan. Birinchi marta (yoki domen o'zgarsa) quyidagi tugmani bosing — Telegram xabarlarni saytga yubora boshlaydi.")}</p><button class="btn" data-tg-setup>${te("Telegram webhook'ni o'rnatish")}</button>`
+          : `<p class="small muted">${te("Bot hali ulanmagan. README'dagi 7-bosqichga qarang: BotFather'da bot yarating va TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, TELEGRAM_WEBHOOK_SECRET o'zgaruvchilarini Netlify'ga kiriting.")}</p>`}
+        <p class="small muted mt-1">✉️ ${te("Email")}: ${state.boot?.features?.email ? `<span class="badge tone-good">${te("ulangan")}</span>` : `<span class="badge tone-warn">${te("ulanmagan")}</span> — ${te("README'dagi 6-bosqich (Resend)")}`}</p></div>
       <div class="card mt-3 danger-zone"><h3>🧹 ${te("Saytni haqiqiy ishga tayyorlash")}</h3>
         <p class="small">${te("Demo foydalanuvchilar (investor@, malika@, fermer@, dehqon@agricrowd.uz), demo loyihalar, ularning investitsiyalari, shartnomalari, to'lovlari va demo yangiliklar hamma uchun o'chiriladi. Test to'lov rejimi va demo tugmalar o'chiriladi. Siz qo'shgan ma'lumotlar saqlanib qoladi.")}</p>
         <button class="btn btn-danger" data-purge>${te("Demo ma'lumotlarni o'chirish")}</button></div>`;
+    $("[data-tg-setup]", el)?.addEventListener("click", (e) => run(e.target, async () => { const r = await api("telegramSetup", {}); toast(t("Webhook o'rnatildi: {url}", { url: r.url })); }));
     $("[data-purge]", el).onclick = async (e) => {
       if (!(await confirmDlg(t("Barcha demo ma'lumotlar o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi. Davom etasizmi?"), { danger: true, ok: t("O'chirish") }))) return;
       run(e.target, async () => { const r = await api("purgeDemo", {}); toast(t("{n} ta demo yozuv o'chirildi", { n: r.removed })); });
@@ -502,7 +515,9 @@ const LOG_LABELS = {
   delete_user: "Foydalanuvchini o'chirdi", update_settings: "Sozlamalarni o'zgartirdi", project_funded: "Loyiha 100% moliyalashtirildi", project_refunded: "Mablag' qaytarildi",
   sign_contract: "Shartnomani imzoladi", review_contract: "Shartnomani tekshirdi", funds_released: "Mablag' fermerga ajratildi", release_funds: "Mablag'ni ajratdi",
   set_template: "Shartnoma shablonini yukladi", create_payment: "To'lov yaratdi", attach_receipt: "Chek yukladi", review_payment: "To'lovni tekshirdi",
-  review_withdrawal: "Yechish so'rovini ko'rib chiqdi", purge_demo: "Demo ma'lumotlarni o'chirdi", save_news: "Yangilikni saqladi", delete_news: "Yangilikni o'chirdi", broadcast: "Xabar yubordi",
+  review_withdrawal: "Yechish so'rovini ko'rib chiqdi", purge_demo: "Demo ma'lumotlarni o'chirdi",
+  password_reset_request: "Parol tiklashni so'radi", password_reset: "Parolni tikladi", telegram_link: "Telegram'ni uladi",
+  add_project_doc: "Loyihaga hujjat qo'shdi", remove_project_doc: "Loyiha hujjatini o'chirdi", save_news: "Yangilikni saqladi", delete_news: "Yangilikni o'chirdi", broadcast: "Xabar yubordi",
 };
 function logTable(logs) {
   if (!logs.length) return `<p class="muted">${te("Yozuvlar yo'q")}</p>`;
@@ -565,6 +580,7 @@ function manageProject(id) {
       <div class="kpis mt-2">${kpi(money(p.goal), "Kerakli mablag'")}${kpi(money(p.raised), t("Yig'ilgan ({n}%)", { n: String(p.percent) }))}${kpi(String(p.investors), "Investorlar")}${kpi(money(p.expectedRevenue), "Kutilayotgan daromad")}</div>
       <div class="row mt-3">
         <button class="btn btn-outline" data-edit>✏️ ${te("Ma'lumotlarni tahrirlash")}</button>
+        <button class="btn btn-outline" data-pdocs>📁 ${te("Hujjatlar")} (${(p.docs || []).length})</button>
         <a class="btn btn-outline" href="#/project/${p.id}" data-close>👁 ${te("Sahifani ko'rish")}</a>
         ${MONITOR_STATUSES.includes(p.status) || p.status === "completed" ? `<a class="btn btn-outline" href="#/admin/monitoring/${p.id}" data-close>📷 ${te("Monitoring")}</a>` : ""}
         ${contracts.length ? `<a class="btn btn-outline" href="#/admin/contracts" data-close>📝 ${te("Shartnomalar")} (${contracts.filter((c) => c.status === "verified").length}/${contracts.length})</a>` : ""}
@@ -590,6 +606,7 @@ function manageProject(id) {
       $$("[data-close]", m).forEach((a) => a.addEventListener("click", close));
       bindOpen(m);
       $("[data-edit]", m).onclick = () => { close(); editProject(id); };
+      $("[data-pdocs]", m).onclick = () => { close(); docsModal(p, { canRemove: true, onChange: reload }); };
       $("[data-approve]", m)?.addEventListener("click", (e) => { close(); run(null, () => api("reviewProject", { id, decision: "approve" }), "Loyiha e'lon qilindi"); });
       $$("[data-status]", m).forEach((b) => (b.onclick = async () => {
         const st = b.dataset.status;

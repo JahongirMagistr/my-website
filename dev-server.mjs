@@ -5,7 +5,7 @@
 import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { handleRequest, handlePayme, handleClick } from "./server/handler.mjs";
+import { handleRequest, handlePayme, handleClick, handleTelegram } from "./server/handler.mjs";
 import { supabaseFromEnv } from "./server/storage.mjs";
 import { createDbAdapter } from "./server/supabase.mjs";
 
@@ -61,7 +61,7 @@ async function makeStorage() {
 }
 
 const storage = await makeStorage();
-const ROUTES = { "/api": handleRequest, "/api/payme": handlePayme, "/api/click": handleClick };
+const ROUTES = { "/api": handleRequest, "/api/payme": handlePayme, "/api/click": handleClick, "/api/telegram": handleTelegram };
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);

@@ -87,6 +87,7 @@ async function investorCabinet(tab) {
 async function farmerCabinet(tab, id) {
   const d = await api("farmerDashboard");
   state.user = d.user;
+  farmerProjects = d.projects;
   const s = d.summary;
   const items = [["overview", "📊 Umumiy ko'rinish"], ["projects", "🌱 Yuborilgan loyihalar", d.projects.length], ["new", "➕ Yangi loyiha"], ["contracts", "📝 Shartnomalar", d.contractsAction], ["monitoring", "📷 Monitoring"], ["wallet", "💳 Hamyon"], ["profile", "👤 Shaxsiy va xo'jalik ma'lumotlari"]];
   const projRows = (list) => list.length ? `<div class="grid">${list.map((p) => `
@@ -99,6 +100,7 @@ async function farmerCabinet(tab, id) {
         <a class="btn btn-sm btn-outline" href="#/project/${p.id}">${te("Ko'rish")}</a>
         ${["pending", "rejected"].includes(p.status) ? `<a class="btn btn-sm btn-outline" href="#/cabinet/edit/${p.id}">✏️ ${te("Tahrirlash")}</a>` : ""}
         ${MONITOR_STATUSES.includes(p.status) ? `<a class="btn btn-sm" href="#/cabinet/monitoring/${p.id}">📷 ${te("Monitoring qo'shish")}</a>` : ""}
+        <button class="btn btn-sm btn-outline" data-docs="${p.id}">📁 ${te("Hujjatlar")} (${(p.docs || []).length})</button>
         <span class="small muted grow right">${te("{n} investor", { n: p.investors })} · ${te("{n} ta monitoring yozuvi", { n: p.updates.length })}</span>
       </div></div>`).join("")}</div>` : `<div class="card empty"><div class="ico">🌱</div><p>${te("Hali loyiha joylashtirmagansiz.")}</p><a class="btn" href="#/cabinet/new">${te("Yangi loyiha")}</a></div>`;
 
@@ -116,7 +118,7 @@ async function farmerCabinet(tab, id) {
     const isEdit = tab === "edit";
     if (isEdit) p = (await api("farmerProject", { id })).project;
     content = `<h2>${te(isEdit ? "Loyihani tahrirlash" : "Yangi loyiha joylashtirish")}</h2>
-      <div class="info-box mb-2">${te("Loyiha ma'lumotlarini to'liq kiriting va «Yuborish» tugmasini bosing. Loyiha avval administrator tomonidan tekshiriladi, tasdiqlangandan so'ng investorlar uchun e'lon qilinadi.")}</div>
+      <div class="info-box mb-2">${te("Loyiha ma'lumotlarini to'liq kiriting va «Yuborish» tugmasini bosing. Loyiha avval administrator tomonidan tekshiriladi, tasdiqlangandan so'ng investorlar uchun e'lon qilinadi.")}<br/>📁 ${te("Hujjatlarni (yer ijarasi, sug'urta va h.k.) loyiha yuborilgach «Yuborilgan loyihalar» bo'limidagi «Hujjatlar» tugmasi orqali yuklaysiz.")}</div>
       <div class="card">${projectFormHtml(p, settings())}<div class="row mt-3"><button class="btn btn-lg" data-submit>📤 ${te("Yuborish")}</button><a class="btn btn-ghost" href="#/cabinet/projects">${te("Bekor qilish")}</a></div></div>`;
     app().innerHTML = dashShell(items, isEdit ? "projects" : "new", content);
     const form = $("#project-form");
@@ -183,7 +185,56 @@ export function bindUpdateForm(uf, fixedProjectId) {
   };
 }
 
+// Loyiha hujjatlari oynasi (fermer va admin)
+export function docsModal(project, { canRemove = false, onChange } = {}) {
+  let docs = project.docs || [];
+  modal({
+    title: t("Loyiha hujjatlari") + " — " + tc(project.title),
+    wide: true,
+    body: `<p class="small muted">${te("Yer ijarasi shartnomasi, xo'jalik guvohnomasi, sug'urta polisi, xaridor bilan shartnoma va boshqa hujjatlar (PDF, JPG yoki PNG). Hujjatlarni administrator, shuningdek loyihaga mablag' kiritgan investorlar ko'ra oladi.")}</p>
+      <div data-doc-list></div>
+      <form class="form mt-2 card-flat" id="doc-form"><div class="form-grid">
+        <label class="field">${te("Hujjat nomi")}<input name="title" placeholder="${te("Masalan: Yer ijarasi shartnomasi")}" required /></label>
+        <label class="field">${te("Fayl")}<input type="file" name="file" accept="application/pdf,image/jpeg,image/png" required /></label></div>
+        <div class="error-box" data-error hidden></div><div><button class="btn">📤 ${te("Yuklash")}</button></div></form>`,
+    onMount(m) {
+      const draw = () => {
+        $("[data-doc-list]", m).innerHTML = docs.length ? `<div class="doc-list">${docs.map((d) => `<div class="doc-item"><span>📄 <b>${esc(d.title || d.name)}</b> <span class="small muted">${esc(d.name)} · ${fileSize(d.size || 0)} · ${date(d.uploadedAt)}</span></span>
+          <span class="row"><button class="btn btn-sm btn-outline" data-open="${esc(d.path)}" data-name="${esc(d.name)}">${te("Ochish")}</button>${canRemove ? `<button class="btn btn-sm btn-ghost" data-rm="${esc(d.path)}">🗑</button>` : ""}</span></div>`).join("")}</div>` : `<p class="muted">${te("Hozircha hujjat yuklanmagan")}</p>`;
+        $$("[data-open]", m).forEach((b) => (b.onclick = () => openFile(b.dataset.open, b.dataset.name).catch((e) => toast(e.message, "err"))));
+        $$("[data-rm]", m).forEach((b) => (b.onclick = async () => {
+          if (!(await confirmDlg(t("Hujjat o'chirilsinmi?"), { danger: true, ok: t("O'chirish") }))) return;
+          try { docs = (await api("removeProjectDoc", { projectId: project.id, path: b.dataset.rm })).docs; draw(); onChange?.(); } catch (e) { toast(e.message, "err"); }
+        }));
+      };
+      draw();
+      const form = $("#doc-form", m);
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const f = form.file.files[0];
+        if (!f) return;
+        await busy(e.submitter, async () => {
+          try {
+            const up = await uploadFile(f, { purpose: "project-doc", refId: project.id });
+            docs = (await api("addProjectDoc", { projectId: project.id, title: form.title.value, file: { path: up.path, name: up.name, size: up.size } })).docs;
+            form.reset();
+            draw();
+            onChange?.();
+            toast(t("Hujjat yuklandi"));
+          } catch (err) { showFormError(form, err.message); }
+        });
+      };
+    },
+  });
+}
+
+let farmerProjects = [];
+
 function bindCommon(tab) {
+  $$("[data-docs]").forEach((b) => (b.onclick = () => {
+    const p = farmerProjects.find((x) => x.id === b.dataset.docs);
+    if (p) docsModal(p, { canRemove: ["pending", "rejected"].includes(p.status), onChange: reload });
+  }));
   $("[data-deposit]")?.addEventListener("click", () => depositModal());
   $$("[data-withdraw]").forEach((b) => b.addEventListener("click", withdrawModal));
   if (tab === "profile") bindProfile();
@@ -471,6 +522,11 @@ function profileHtml() {
     <div class="error-box" data-error hidden></div>
     <div><button class="btn">${te("Saqlash")}</button></div>
   </form></div>
+  ${state.boot?.features?.telegram ? `<div class="card mt-2"><h3>✈️ ${te("Telegram bildirishnomalari")}</h3>
+    <p class="small muted">${te("Loyiha, shartnoma va to'lovlar haqidagi barcha xabarlar Telegram'ingizga keladi.")}</p>
+    ${u.telegramLinked ? `<div class="row"><span class="badge tone-good">${te("Ulangan")}</span><button class="btn btn-sm btn-ghost" data-tg-off>${te("O'chirish")}</button></div>`
+      : `<button class="btn" data-tg-on>✈️ ${te("Telegram'ni ulash")}</button><p class="small muted mt-1">${te("Tugmani bosing, Telegram'da ochilgan botda «Start» ni bosing, so'ng shu sahifani yangilang.")}</p>`}
+  </div>` : ""}
   <div class="card mt-2"><form class="form" id="pw-form"><h3>${te("Parolni o'zgartirish")}</h3><div class="form-grid">
     <label class="field">${te("Joriy parol")}<input name="oldPassword" type="password" required /></label>
     <label class="field">${te("Yangi parol")}<input name="newPassword" type="password" minlength="6" required /></label></div>
@@ -480,6 +536,17 @@ function profileHtml() {
 const pick = (d, prefix) => Object.fromEntries(Object.entries(d).filter(([k]) => k.startsWith(prefix)).map(([k, v]) => [k.slice(prefix.length), v]));
 
 function bindProfile() {
+  $("[data-tg-on]")?.addEventListener("click", async (e) => {
+    const win = window.open("", "_blank");
+    try {
+      const { url } = await api("telegramLink", {});
+      if (win) win.location = url; else location.href = url;
+      e.target.outerHTML = `<button class="btn btn-outline" onclick="location.reload()">${te("Ulandi — sahifani yangilash")}</button>`;
+    } catch (err) { win?.close(); toast(err.message, "err"); }
+  });
+  $("[data-tg-off]")?.addEventListener("click", async () => {
+    try { state.user = (await api("telegramUnlink", {})).user; toast(t("Telegram o'chirildi")); reload(); } catch (err) { toast(err.message, "err"); }
+  });
   const form = $("#profile-form");
   form.onsubmit = async (e) => {
     e.preventDefault();

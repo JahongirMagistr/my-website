@@ -1,5 +1,5 @@
 // Agricrowd.uz — asosiy ilova: sarlavha, marshrutlash, ommaviy sahifalar, kirish/ro'yxatdan o'tish
-import { api, getMode, setToken, hasToken, resetDemo } from "./store.js";
+import { api, getMode, setToken, hasToken, resetDemo, openFile } from "./store.js";
 import { STATUSES } from "./core.js";
 import { t, tv, tc, LANGS, getLang, setLang, flagSvg, contentText } from "./i18n.js";
 import {
@@ -200,6 +200,8 @@ const ROUTES = [
   [/^\/contact$/, pageContact, "contact"],
   [/^\/login$/, pageLogin, "login"],
   [/^\/register$/, pageRegister, "register"],
+  [/^\/forgot$/, pageForgot, "login"],
+  [/^\/reset$/, pageReset, "login"],
   [/^\/notifications$/, pageNotifications, "cabinet"],
   [/^\/payment-return$/, pagePaymentReturn, "cabinet"],
   [/^\/cabinet(?:\/([\w-]+))?(?:\/([\w-]+))?$/, (tab, id) => renderCabinet(tab, id), "cabinet"],
@@ -478,7 +480,8 @@ async function pageProject(id) {
           <div class="guarantee"><div class="ico">📜</div><div><h4 class="mb-0">${te("Kafolat")}</h4><p>${esc(tc(p.guarantee)) || "—"}</p></div></div>
           <div class="guarantee"><div class="ico">⭐</div><div><h4 class="mb-0">${te("Fermerning reytingi / faoliyati")}</h4><p>${stars(f.rating)} · ${te("platformada {total} ta loyiha, {done} tasi muvaffaqiyatli yakunlangan", { total: f.projectsTotal || 0, done: f.projectsCompleted || 0 })}</p></div></div>
           <div class="guarantee"><div class="ico">📷</div><div><h4 class="mb-0">${te("Loyiha monitoringi")}</h4><p>${te("Loyiha moliyalashtirilgandan keyin foto, video va holat ma'lumotlari orqali platforma tomonidan nazorat qilinadi.")}</p></div></div>
-          <div class="guarantee" style="border:0"><div class="ico">📁</div><div><h4 class="mb-0">${te("Taqdim etilgan hujjatlar")}</h4><p>${esc(tc(p.documents)) || "—"}</p></div></div>
+          <div class="guarantee" style="border:0"><div class="ico">📁</div><div><h4 class="mb-0">${te("Taqdim etilgan hujjatlar")}</h4><p>${esc(tc(p.documents)) || "—"}</p>
+            ${p.docs?.length ? `<div class="row">${p.docs.map((d) => `<button class="btn btn-sm btn-outline" data-open-doc="${esc(d.path)}" data-name="${esc(d.name)}">📄 ${esc(d.title || d.name)}</button>`).join("")}</div>` : p.docsCount || p.docs === undefined ? `<p class="small muted">${te("Hujjat fayllarini administrator va loyihaga mablag' kiritgan investorlar ko'ra oladi.")}</p>` : ""}</div></div>
         </div>
         <div data-pane="monitor" hidden>${statusTrack(p.status)}<div class="mt-3">${timeline(p.updates)}</div></div>
       </div>
@@ -509,6 +512,7 @@ async function pageProject(id) {
     $$("[data-pane]").forEach((x) => (x.hidden = x.dataset.pane !== b.dataset.tab));
   }));
   $("[data-invest]")?.addEventListener("click", () => investModal(p));
+  $$("[data-open-doc]").forEach((b) => (b.onclick = () => openFile(b.dataset.openDoc, b.dataset.name).catch((e) => toast(e.message, "err"))));
 }
 
 function investModal(p) {
@@ -761,7 +765,7 @@ function pageLogin() {
       <button class="btn btn-lg btn-block">${te("Kirish")}</button>
     </form>
     <p class="mt-2 mb-0 small">${te("Hisobingiz yo'qmi?")} <a href="#/register">${te("Ro'yxatdan o'tish")}</a></p>
-    <p class="mt-1 mb-0 small muted">${te("Parolni unutdingizmi? Administratorga murojaat qiling:")} <a href="#/contact">${te("Biz bilan bog'lanish")}</a></p>
+    <p class="mt-1 mb-0 small"><a href="#/forgot">${te("Parolni unutdingizmi?")}</a></p>
     ${demoHint()}
   </div></div>`;
   const form = $("#login-form");
@@ -776,6 +780,56 @@ function pageLogin() {
     });
   };
   $$("[data-demo]").forEach((b) => (b.onclick = () => { form.email.value = b.dataset.demo; form.password.value = b.dataset.pw; form.requestSubmit(); }));
+}
+
+function pageForgot() {
+  const emailOn = state.boot?.features?.email;
+  app().innerHTML = `<div class="container"><div class="auth-wrap card">
+    <h2>${te("Parolni tiklash")}</h2>
+    ${emailOn || getMode() === "demo" ? `<p class="muted">${te("Emailingizni kiriting — parolni tiklash havolasini yuboramiz.")}</p>
+    <form class="form" id="forgot-form">
+      <label class="field">${te("Email")}<input name="email" type="email" autocomplete="email" required /></label>
+      <div class="error-box" data-error hidden></div>
+      <button class="btn btn-lg btn-block">${te("Havolani yuborish")}</button>
+    </form>` : `<div class="warn-box">${te("Email xizmati hali ulanmagan. Parolni tiklash uchun administratorga murojaat qiling.")}</div><a class="btn mt-2" href="#/contact">${te("Biz bilan bog'lanish")}</a>`}
+    <p class="mt-2 mb-0 small"><a href="#/login">← ${te("Kirish")}</a></p>
+  </div></div>`;
+  const form = $("#forgot-form");
+  if (!form) return;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    await busy(e.submitter, async () => {
+      try {
+        await api("forgotPassword", formData(form));
+        form.outerHTML = `<div class="info-box">✉️ ${te("Agar bu email ro'yxatdan o'tgan bo'lsa, parolni tiklash havolasi yuborildi. Pochtangizni (va «Spam» papkasini) tekshiring. Havola 1 soat amal qiladi.")}</div>`;
+      } catch (err) { showFormError(form, err.message); }
+    });
+  };
+}
+
+function pageReset() {
+  const q = query();
+  app().innerHTML = `<div class="container"><div class="auth-wrap card">
+    <h2>${te("Yangi parol o'rnatish")}</h2><p class="muted">${esc(q.email || "")}</p>
+    <form class="form" id="reset-form">
+      <label class="field">${te("Yangi parol")} <small>(${te("kamida 6 belgi")})</small><input name="password" type="password" minlength="6" required autocomplete="new-password" /></label>
+      <label class="field">${te("Parolni takrorlang")}<input name="password2" type="password" required autocomplete="new-password" /></label>
+      <div class="error-box" data-error hidden></div>
+      <button class="btn btn-lg btn-block">${te("Saqlash")}</button>
+    </form></div></div>`;
+  const form = $("#reset-form");
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const d = formData(form);
+    if (d.password !== d.password2) return showFormError(form, t("Parollar mos kelmadi"));
+    await busy(e.submitter, async () => {
+      try {
+        await api("resetPassword", { email: q.email, token: q.token, password: d.password });
+        toast(t("Parol yangilandi. Endi yangi parol bilan kiring"));
+        go("/login");
+      } catch (err) { showFormError(form, err.message); }
+    });
+  };
 }
 
 function demoHint() {

@@ -1,8 +1,8 @@
 // Umumiy API so'rov ishlovchisi: Netlify Functions va lokal dev-server uchun.
 import crypto from "node:crypto";
-import { handle, tick, seed, emptyDb, normalizeDb, ApiError, READ_ONLY } from "../public/js/core.js";
+import { handle, tick, seed, emptyDb, normalizeDb, ApiError, READ_ONLY, telegramUpdate } from "../public/js/core.js";
 import { paymentConfig, checkoutUrl, paymeRpc, clickCallback } from "./payments.mjs";
-import { sendOutbox } from "./mailer.mjs";
+import { sendOutbox, telegramSend, siteUrl } from "./mailer.mjs";
 
 const SECRET = process.env.AUTH_SECRET || "agricrowd-dev-secret-change-me";
 const TOKEN_TTL = 1000 * 60 * 60 * 24 * 7; // 7 kun
@@ -86,7 +86,8 @@ export async function withDb(storage, fn, { readOnly = false } = {}) {
       await new Promise((r) => setTimeout(r, 30 + Math.random() * 120 * (attempt + 1)));
       continue;
     }
-    if (mutated) sendOutbox(outbox).catch((e) => console.error("mail", e));
+    // Netlify funksiyasi javobdan keyin to'xtatiladi — xabarlar javobdan oldin yuboriladi
+    if (mutated) await sendOutbox(outbox).catch((e) => console.error("notify", e));
     if (error) throw error;
     return result;
   }
@@ -97,6 +98,8 @@ function baseCtx(storage, db, outbox, user) {
   return {
     user, hash, issueToken, outbox, signUpload, verifyUpload, files: storage.files,
     payments: { methods: paymentConfig().methods, checkoutUrl },
+    telegram: process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_USERNAME ? { bot: process.env.TELEGRAM_BOT_USERNAME.replace(/^@/, "") } : null,
+    features: { email: !!process.env.RESEND_API_KEY },
   };
 }
 
@@ -113,6 +116,7 @@ export async function handleRequest(req, storage) {
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const uid = readToken(token);
   try {
+    if (action === "telegramSetup") return json(200, await telegramSetup(storage, uid));
     const result = await withDb(storage, async (db, outbox) => {
       const user = uid ? db.users.find((u) => u.id === uid) || null : null;
       return handle(db, action, payload, baseCtx(storage, db, outbox, user));
@@ -149,4 +153,38 @@ export async function handleClick(req, storage) {
     console.error(e);
     return json(200, { error: -8, error_note: "Error in request" });
   }
+}
+
+// Telegram webhook: POST /api/telegram (Telegram serverlari chaqiradi)
+export async function handleTelegram(req, storage) {
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+  if (!process.env.TELEGRAM_BOT_TOKEN || !secret || req.headers.get("x-telegram-bot-api-secret-token") !== secret) return json(403, { ok: false });
+  let update = {};
+  try { update = await req.json(); } catch { return json(200, { ok: true }); }
+  try {
+    const reply = await withDb(storage, async (db) => telegramUpdate(db, update));
+    if (reply) await telegramSend(reply.chatId, reply.key, reply.params, reply.lang);
+  } catch (e) {
+    console.error("telegram", e);
+  }
+  return json(200, { ok: true });
+}
+
+// Admin paneldagi «Telegram botni ulash» tugmasi: webhook manzilini Telegram'ga ro'yxatdan o'tkazadi
+async function telegramSetup(storage, uid) {
+  const loaded = await storage.load();
+  const user = loaded?.db?.users?.find((u) => u.id === uid);
+  if (!user || user.role !== "admin") throw new ApiError("Bu amal uchun ruxsat yo'q", 403);
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!token || !secret || !process.env.TELEGRAM_BOT_USERNAME) throw new ApiError("Telegram bot hali ulanmagan");
+  const url = `${siteUrl()}/api/telegram`;
+  const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ url, secret_token: secret, allowed_updates: ["message"] }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!data.ok) throw new ApiError("Telegram xatosi: {msg}", 400, { msg: data.description || r.status });
+  return { ok: true, url };
 }

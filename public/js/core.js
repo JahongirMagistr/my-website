@@ -139,8 +139,8 @@ export function normalizeDb(db) {
 
 export function publicUser(u) {
   if (!u) return null;
-  const { passHash, salt, ...rest } = u;
-  return rest;
+  const { passHash, salt, resetHash, resetExp, resetRequestedAt, tgCode, tgCodeExp, telegramChatId, ...rest } = u;
+  return { ...rest, telegramLinked: !!telegramChatId };
 }
 
 function log(db, userId, action, details = "") {
@@ -156,10 +156,17 @@ function notify(db, ctx, userId, title, body, params = {}, link = "") {
   const user = findUser(db, userId);
   if (!user) return;
   db.notifications.unshift({ id: uid("n"), userId, title, body, params, link, read: false, createdAt: now() });
-  ctx?.outbox?.push({ to: user.email, lang: user.lang || "uz", name: user.name, title, body, params, link });
+  ctx?.outbox?.push({ to: user.email, telegramChatId: user.telegramChatId || null, lang: user.lang || "uz", name: user.name, title, body, params, link });
 }
 const notifyAdmins = (db, ctx, title, body, params, link) =>
   db.users.filter((u) => u.role === "admin" && !u.blocked).forEach((a) => notify(db, ctx, a.id, title, body, params, link));
+
+// Tasodifiy xavfsiz token (server va brauzerda)
+const randomToken = (bytes = 24) => {
+  const a = new Uint8Array(bytes);
+  globalThis.crypto.getRandomValues(a);
+  return [...a].map((b) => b.toString(16).padStart(2, "0")).join("");
+};
 
 const findUser = (db, id) => db.users.find((u) => u.id === id);
 const findProject = (db, id) => db.projects.find((p) => p.id === id) || fail("Loyiha topilmadi", 404);
@@ -196,7 +203,7 @@ function farmerCard(db, farmerId) {
   };
 }
 
-const stripHeavy = (p) => { const e = { ...p }; if (e.image?.startsWith("data:")) { delete e.image; e.hasImage = true; } return e; };
+const stripHeavy = (p) => { const e = { ...p }; e.docsCount = (p.docs || []).length; delete e.docs; if (e.image?.startsWith("data:")) { delete e.image; e.hasImage = true; } return e; };
 
 function enrich(db, p, { full = false } = {}) {
   const out = { ...p, ...projectStats(db, p) };
@@ -432,12 +439,23 @@ export function authorizeUpload(db, user, { purpose, refId, contentType, size })
     if (c.status === "verified") fail("Shartnoma allaqachon tasdiqlangan");
     return { bucket: "documents", path: `contracts/${c.id}/${side}-${rnd}.${ext(contentType)}`, public: false };
   }
+  if (purpose === "project-doc") {
+    const p = findProject(db, refId);
+    if (!(user.role === "admin" || p.farmerId === user.id)) fail("Bu loyiha sizga tegishli emas", 403);
+    return { bucket: "documents", path: `projects/${p.id}/${rnd}.${ext(contentType)}`, public: false };
+  }
   if (purpose === "receipt") {
     const p = findIn(db.payments, refId, "To'lov topilmadi");
     if (p.userId !== user.id) fail("Bu amal uchun ruxsat yo'q", 403);
     return { bucket: "documents", path: `receipts/${p.id}/${rnd}.${ext(contentType)}`, public: false };
   }
   fail("Fayl noto'g'ri");
+}
+
+// Loyiha hujjatlarini kim ko'ra oladi: admin, loyiha egasi va loyihaga mablag' kiritgan investorlar
+function canSeeProjectDocs(db, user, p) {
+  if (!user) return false;
+  return user.role === "admin" || p.farmerId === user.id || db.investments.some((i) => i.projectId === p.id && i.investorId === user.id && i.status !== "refunded");
 }
 
 // Maxfiy faylni o'qish huquqi
@@ -451,11 +469,41 @@ export function authorizeRead(db, user, path) {
     const c = db.contracts.find((x) => x.id === id);
     if (c && (c.investorId === user.id || c.farmerId === user.id)) return true;
   }
+  if (folder === "projects") {
+    const p = db.projects.find((x) => x.id === id);
+    if (p && canSeeProjectDocs(db, user, p)) return true;
+  }
   if (folder === "receipts") {
     const p = db.payments.find((x) => x.id === id);
     if (p && p.userId === user.id) return true;
   }
   fail("Bu amal uchun ruxsat yo'q", 403);
+}
+
+// Telegram botiga kelgan xabar: /start <kod> — hisobni ulaydi, /stop — uzadi. Javob matnini qaytaradi.
+export function telegramUpdate(db, update) {
+  const msg = update?.message;
+  const chatId = msg?.chat?.id;
+  const text = String(msg?.text || "").trim();
+  if (!chatId) return null;
+  const chat = String(chatId);
+  if (text.startsWith("/start")) {
+    const code = text.split(/\s+/)[1];
+    const u = code && db.users.find((x) => x.tgCode === code && x.tgCodeExp && Date.parse(x.tgCodeExp) > Date.now());
+    if (!u) return { chatId: chat, key: "Agricrowd.uz botiga xush kelibsiz! Hisobingizni ulash uchun saytdagi Profil → «Telegram'ni ulash» tugmasini bosing." };
+    for (const other of db.users) if (other.telegramChatId === chat) other.telegramChatId = null;
+    u.telegramChatId = chat;
+    u.tgCode = null;
+    u.tgCodeExp = null;
+    log(db, u.id, "telegram_link", chat);
+    return { chatId: chat, key: "✅ Hisobingiz ulandi, {name}! Endi barcha bildirishnomalar shu yerga keladi. O'chirish uchun /stop yozing.", params: { name: u.name }, lang: u.lang };
+  }
+  if (text.startsWith("/stop")) {
+    const u = db.users.find((x) => x.telegramChatId === chat);
+    if (u) u.telegramChatId = null;
+    return { chatId: chat, key: "Bildirishnomalar o'chirildi. Qayta ulash uchun saytdagi Profil bo'limiga kiring.", lang: u?.lang };
+  }
+  return { chatId: chat, key: "Bu bot faqat Agricrowd.uz bildirishnomalarini yuboradi. Savollar uchun saytdagi «Biz bilan bog'lanish» bo'limiga yozing." };
 }
 
 // ---------------------------------------------------------------------------
@@ -520,6 +568,7 @@ const ACTIONS = {
     return {
       settings: db.settings,
       paymentMethods: paymentMethods(db, ctx),
+      features: { telegram: !!ctx.telegram?.bot, email: !!ctx.features?.email },
       projects,
       news: db.news.filter((n) => n.published).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 30).map((n) => ({ ...n, body: n.body.slice(0, 400) })),
       stats: { projects: projects.length, farmers: a.farmers, investors: a.investors, totalRaised: a.totalRaised, completed: a.byStatus.completed || 0 },
@@ -532,6 +581,7 @@ const ACTIONS = {
     const allowed = PUBLIC_STATUSES.includes(p.status) || (u && (u.role === "admin" || u.id === p.farmerId));
     if (!allowed) fail("Loyiha hali e'lon qilinmagan", 404);
     const out = enrich(db, p, { full: true });
+    if (!canSeeProjectDocs(db, u, p)) delete out.docs;
     if (u) out.myInvestments = db.investments.filter((i) => i.projectId === p.id && i.investorId === u.id);
     return out;
   },
@@ -619,6 +669,81 @@ const ACTIONS = {
     u.passHash = await ctx.hash(String(newPassword), u.salt);
     log(db, u.id, "change_password");
     return { ok: true };
+  },
+
+  // --- Parolni tiklash (email orqali) ---------------------------------------
+  async forgotPassword(db, { email }, ctx) {
+    email = str(email, 120).toLowerCase();
+    const u = db.users.find((x) => x.email === email && !x.blocked);
+    // Foydalanuvchi bor-yo'qligini oshkor qilmaslik uchun javob har doim bir xil
+    if (u && (!u.resetRequestedAt || Date.now() - Date.parse(u.resetRequestedAt) > 60_000)) {
+      const token = randomToken();
+      u.resetHash = await ctx.hash(token, "reset:" + u.id);
+      u.resetExp = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      u.resetRequestedAt = now();
+      ctx.outbox?.push({
+        to: u.email, telegramChatId: null, lang: u.lang || "uz", name: u.name, button: "Parolni tiklash",
+        title: "Parolni tiklash", body: "Parolingizni tiklash uchun quyidagi tugmani bosing. Havola 1 soat amal qiladi. Agar siz so'ramagan bo'lsangiz, bu xatni e'tiborsiz qoldiring.",
+        params: {}, link: `/reset?email=${encodeURIComponent(u.email)}&token=${token}`,
+      });
+      log(db, u.id, "password_reset_request", email);
+    }
+    return { ok: true };
+  },
+
+  async resetPassword(db, { email, token, password }, ctx) {
+    email = str(email, 120).toLowerCase();
+    const u = db.users.find((x) => x.email === email);
+    const bad = () => fail("Havola noto'g'ri yoki muddati o'tgan. Qaytadan so'rov yuboring");
+    if (!u || !u.resetHash || !token || !u.resetExp || Date.parse(u.resetExp) < Date.now()) bad();
+    if ((await ctx.hash(String(token), "reset:" + u.id)) !== u.resetHash) bad();
+    if (!password || String(password).length < 6) fail("Parol kamida 6 belgidan iborat bo'lishi kerak");
+    u.salt = uid("s");
+    u.passHash = await ctx.hash(String(password), u.salt);
+    u.resetHash = null;
+    u.resetExp = null;
+    log(db, u.id, "password_reset", email);
+    return { ok: true };
+  },
+
+  // --- Telegram ----------------------------------------------------------
+  telegramLink(db, _p, ctx) {
+    const u = requireUser(ctx);
+    if (!ctx.telegram?.bot) fail("Telegram bot hali ulanmagan");
+    u.tgCode = randomToken(12);
+    u.tgCodeExp = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    return { url: `https://t.me/${ctx.telegram.bot}?start=${u.tgCode}` };
+  },
+
+  telegramUnlink(db, _p, ctx) {
+    const u = requireUser(ctx);
+    u.telegramChatId = null;
+    return { user: publicUser(u) };
+  },
+
+  // --- Loyiha hujjatlari -------------------------------------------------
+  addProjectDoc(db, { projectId, file, title }, ctx) {
+    const u = requireUser(ctx, ["farmer", "admin"]);
+    const p = findProject(db, projectId);
+    if (u.role !== "admin" && p.farmerId !== u.id) fail("Bu loyiha sizga tegishli emas", 403);
+    p.docs = Array.isArray(p.docs) ? p.docs : [];
+    if (p.docs.length >= 20) fail("Hujjatlar soni 20 tadan oshmasligi kerak");
+    const ref = fileRef(file, `projects/${p.id}/`);
+    ref.title = str(title, 200) || ref.name;
+    ref.uploadedBy = u.id;
+    p.docs.push(ref);
+    if (u.role === "farmer" && p.status === "pending") notifyAdmins(db, ctx, "Loyihaga hujjat qo'shildi", "«{project}»: {title}", { project: p.title, title: ref.title }, "/admin/review");
+    log(db, u.id, "add_project_doc", `${p.title}: ${ref.title}`);
+    return { docs: p.docs };
+  },
+
+  removeProjectDoc(db, { projectId, path }, ctx) {
+    const u = requireUser(ctx, ["farmer", "admin"]);
+    const p = findProject(db, projectId);
+    if (u.role !== "admin" && (p.farmerId !== u.id || !["pending", "rejected"].includes(p.status))) fail("E'lon qilingan loyihani faqat administrator o'zgartira oladi");
+    p.docs = (p.docs || []).filter((d) => d.path !== path);
+    log(db, u.id, "remove_project_doc", p.title);
+    return { docs: p.docs };
   },
 
   // --- Bildirishnomalar ---------------------------------------------------
@@ -789,7 +914,7 @@ const ACTIONS = {
     const p = {
       id: uid("p"), farmerId, ...data, raised: 0,
       status: u.role === "admin" && payload.publish ? "funding" : "pending",
-      adminNote: "", featured: false, contractTemplate: null, distribution: null, actualRevenue: null,
+      adminNote: "", featured: false, contractTemplate: null, docs: [], distribution: null, actualRevenue: null,
       createdAt: now(), submittedAt: now(), approvedAt: null, fundedAt: null, disbursedAt: null, refundedAt: null, completedAt: null,
     };
     if (p.status === "funding") p.approvedAt = now();
@@ -818,7 +943,7 @@ const ACTIONS = {
     const projects = db.projects
       .filter((p) => p.farmerId === u.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((p) => stripHeavy(enrich(db, p, { full: true })));
+      .map((p) => ({ ...stripHeavy(enrich(db, p, { full: true })), docs: p.docs || [] }));
     const contracts = db.contracts.filter((c) => c.farmerId === u.id);
     return {
       user: publicUser(u),
@@ -883,7 +1008,7 @@ const ACTIONS = {
       settings: db.settings,
       analytics: analytics(db),
       users: db.users.map(publicUser),
-      projects: db.projects.map((p) => stripHeavy(enrich(db, p))),
+      projects: db.projects.map((p) => ({ ...stripHeavy(enrich(db, p)), docs: p.docs || [] })),
       investments: db.investments,
       updates: db.updates.map((u) => ({ ...u, images: u.images.length })),
       transactions: db.transactions.slice(0, 1000),

@@ -157,3 +157,68 @@ test("demo ma'lumotlarni o'chirish: haqiqiy ma'lumotlar saqlanadi", async () => 
   assert.equal(db.settings.showDemoLogins, false);
   assert.equal((await handle(db, "bootstrap", {}, {})).stats.totalRaised, 0);
 });
+
+test("parolni email orqali tiklash", async () => {
+  const { db } = await setup();
+  const outbox = [];
+  const ctx = { hash, issueToken, outbox };
+  await handle(db, "forgotPassword", { email: "nobody@x.uz" }, ctx);
+  assert.equal(outbox.length, 0, "yo'q email — xat yuborilmaydi, javob esa bir xil");
+  await handle(db, "forgotPassword", { email: "INVESTOR@agricrowd.uz" }, ctx);
+  assert.equal(outbox.length, 1);
+  const link = new URLSearchParams(outbox[0].link.split("?")[1]);
+  const token = link.get("token");
+  const u = db.users.find((x) => x.id === "u_inv1");
+  assert.ok(u.resetHash && u.resetHash !== token, "token ochiq holda saqlanmaydi");
+  await handle(db, "forgotPassword", { email: "investor@agricrowd.uz" }, ctx);
+  assert.equal(outbox.length, 1, "1 daqiqa ichida takroriy xat yuborilmaydi");
+  await assert.rejects(handle(db, "resetPassword", { email: "investor@agricrowd.uz", token: "bad", password: "newpass1" }, ctx), /muddati/);
+  await handle(db, "resetPassword", { email: "investor@agricrowd.uz", token, password: "newpass1" }, ctx);
+  await handle(db, "login", { email: "investor@agricrowd.uz", password: "newpass1" }, ctx);
+  await assert.rejects(handle(db, "resetPassword", { email: "investor@agricrowd.uz", token, password: "other12" }, ctx), /muddati/, "token bir martalik");
+  const { user } = await handle(db, "me", {}, { user: u });
+  assert.equal(user.resetHash, undefined);
+});
+
+test("Telegram: hisobni ulash va xabarlar", async () => {
+  const { telegramUpdate } = await import("../public/js/core.js");
+  const { db, as } = await setup();
+  const ctx = { ...as("u_inv1"), telegram: { bot: "agricrowd_bot" } };
+  await assert.rejects(handle(db, "telegramLink", {}, as("u_inv1")), /ulanmagan/);
+  const { url } = await handle(db, "telegramLink", {}, ctx);
+  const code = url.split("start=")[1];
+  assert.match(url, /^https:\/\/t\.me\/agricrowd_bot\?start=/);
+  assert.equal(telegramUpdate(db, { message: { chat: { id: 555 }, text: "/start wrong" } }).key.includes("xush kelibsiz"), true);
+  const r = telegramUpdate(db, { message: { chat: { id: 555 }, text: `/start ${code}` } });
+  assert.match(r.key, /ulandi/);
+  const u = db.users.find((x) => x.id === "u_inv1");
+  assert.equal(u.telegramChatId, "555");
+  assert.equal((await handle(db, "me", {}, { user: u })).user.telegramLinked, true);
+  const adminOut = [];
+  u.bank = { card: "8600" };
+  await handle(db, "requestWithdrawal", { amount: 10000 }, { ...as("u_inv1"), outbox: adminOut });
+  await handle(db, "reviewWithdrawal", { id: db.withdrawals[0].id, decision: "paid" }, { ...as("u_admin"), outbox: adminOut });
+  assert.ok(adminOut.some((m) => m.telegramChatId === "555"), "investor xabari Telegram'ga ham ketadi");
+  telegramUpdate(db, { message: { chat: { id: 555 }, text: "/stop" } });
+  assert.equal(u.telegramChatId, null);
+});
+
+test("loyiha hujjatlari: kim yuklay va ko'ra oladi", async () => {
+  const { db, as } = await setup();
+  const doc = (p) => ({ path: `projects/${p}/a.pdf`, name: "ijara.pdf", size: 10 });
+  await assert.rejects(handle(db, "uploadInit", { purpose: "project-doc", refId: "p_tomato", contentType: "application/pdf", size: 10 }, as("u_farm2")), /tegishli emas/);
+  await handle(db, "uploadInit", { purpose: "project-doc", refId: "p_tomato", contentType: "application/pdf", size: 10 }, { ...as("u_farm1"), signUpload: async () => "t" });
+  await handle(db, "addProjectDoc", { projectId: "p_tomato", title: "Yer ijarasi", file: doc("p_tomato") }, as("u_farm1"));
+  await assert.rejects(handle(db, "addProjectDoc", { projectId: "p_tomato", file: doc("p_potato") }, as("u_farm1")), /noto'g'ri/);
+  const path = "projects/p_tomato/a.pdf";
+  await handle(db, "fileUrl", { path }, as("u_inv1")); // mablag' kiritgan investor
+  await handle(db, "fileUrl", { path }, as("u_admin"));
+  const ctx = { hash, issueToken, outbox: [] };
+  const other = (await handle(db, "register", { role: "investor", name: "B", email: "b@x.uz", password: "secret1" }, ctx)).user;
+  await assert.rejects(handle(db, "fileUrl", { path }, as(other.id)), /ruxsat/);
+  assert.equal((await handle(db, "getProject", { id: "p_tomato" }, as(other.id))).docs, undefined, "begona investorga hujjat ro'yxati berilmaydi");
+  assert.equal((await handle(db, "getProject", { id: "p_tomato" }, as("u_inv1"))).docs.length, 1);
+  assert.equal((await handle(db, "bootstrap", {}, {})).projects.find((p) => p.id === "p_tomato").docs, undefined);
+  await assert.rejects(handle(db, "removeProjectDoc", { projectId: "p_tomato", path }, as("u_farm1")), /administrator/, "e'lon qilingan loyihada fermer o'chira olmaydi");
+  await handle(db, "removeProjectDoc", { projectId: "p_tomato", path }, as("u_admin"));
+});

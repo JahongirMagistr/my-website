@@ -125,6 +125,15 @@ create table if not exists public.messages (
   status text, admin_note text, created_at timestamptz
 );
 
+-- Keyingi versiyalarda qo'shilgan ustunlar (eski bazani yangilash uchun ham xavfsiz)
+alter table public.users add column if not exists reset_hash text;
+alter table public.users add column if not exists reset_exp timestamptz;
+alter table public.users add column if not exists reset_requested_at timestamptz;
+alter table public.users add column if not exists tg_code text;
+alter table public.users add column if not exists tg_code_exp timestamptz;
+alter table public.users add column if not exists telegram_chat_id text;
+alter table public.projects add column if not exists docs jsonb;
+
 create index if not exists projects_status_idx on public.projects(status);
 create index if not exists investments_project_idx on public.investments(project_id);
 create index if not exists investments_investor_idx on public.investments(investor_id);

@@ -44,3 +44,25 @@ test("PostgreSQL adapteri: saqlash, qayta yuklash, faqat o'zgarganlar, versiya k
   assert.equal((await pool.query("select count(*) from projects")).rows[0].count, "4");
   await pool.end();
 });
+
+test("PostgreSQL: yangi maydonlar (parol tiklash, Telegram, hujjatlar) saqlanadi", { skip: !url && "TEST_DATABASE_URL yo'q" }, async () => {
+  const { default: pg } = await import("pg");
+  const pool = new pg.Pool({ connectionString: url });
+  const rpc = async (name, args) => {
+    const sql = name === "agri_load" ? "select public.agri_load($1) as r" : "select public.agri_apply($1, $2, $3) as r";
+    const params = name === "agri_load" ? [args.log_limit] : [args.expected_version, JSON.stringify(args.changes), args.new_settings == null ? null : JSON.stringify(args.new_settings)];
+    return (await pool.query(sql, params)).rows[0].r;
+  };
+  const a = createDbAdapter(rpc);
+  const l = await a.load();
+  const u = l.db.users.find((x) => x.id === "u_inv1");
+  u.telegramChatId = "777"; u.resetHash = "h"; u.resetExp = new Date(Date.now() + 1e6).toISOString();
+  l.db.projects[0].docs = [{ path: "projects/x/a.pdf", name: "a.pdf", title: "Ijara" }];
+  assert.equal(await a.save(l.db, l.etag), true);
+  const l2 = await a.load();
+  const u2 = l2.db.users.find((x) => x.id === "u_inv1");
+  assert.equal(u2.telegramChatId, "777");
+  assert.equal(u2.resetHash, "h");
+  assert.equal(l2.db.projects.find((p) => p.id === l.db.projects[0].id).docs[0].title, "Ijara");
+  await pool.end();
+});

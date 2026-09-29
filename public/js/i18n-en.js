@@ -996,6 +996,16 @@ export default {
 "Click orqali to'lov": "Payment via Click",
 "To'lov bekor qilindi (Payme)": "Payment cancelled (Payme)",
 "Bosh sahifada statistikani ko'rsatish (loyihalar soni, jalb qilingan mablag', investorlar)": "Show statistics on the home page (projects, funds raised, investors)",
+"Sayt vaqtincha ishlamayapti": "The site is temporarily unavailable",
+"Server bilan aloqa yo'q. Iltimos, birozdan keyin qayta urinib ko'ring.": "Cannot reach the server. Please try again a little later.",
+"Administrator uchun: /api funksiyasi javob bermayapti. Sayt Netlify'ga GitHub orqali (funksiyalar bilan) joylanganini va muhit o'zgaruvchilari to'g'riligini tekshiring.": "For the administrator: the /api function is not responding. Check that the site is deployed to Netlify from GitHub (with functions) and that the environment variables are set.",
+"Kirish sahifasida demo hisob tugmalarini ko'rsatish": "Show demo account buttons on the sign-in page",
+"Saytni haqiqiy ishga tayyorlash": "Prepare the site for real use",
+"Demo foydalanuvchilar (investor@, malika@, fermer@, dehqon@agricrowd.uz), demo loyihalar, ularning investitsiyalari, shartnomalari, to'lovlari va demo yangiliklar hamma uchun o'chiriladi. Test to'lov rejimi va demo tugmalar o'chiriladi. Siz qo'shgan ma'lumotlar saqlanib qoladi.": "Demo users (investor@, malika@, fermer@, dehqon@agricrowd.uz), demo projects and their investments, contracts, payments and demo news will be deleted for everyone. Test payments and demo buttons are switched off. Data you added is kept.",
+"Demo ma'lumotlarni o'chirish": "Delete demo data",
+"Barcha demo ma'lumotlar o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi. Davom etasizmi?": "All demo data will be deleted. This cannot be undone. Continue?",
+"{n} ta demo yozuv o'chirildi": "{n} demo records deleted",
+"Demo ma'lumotlarni o'chirdi": "Deleted demo data",
 "Payme": "Payme",
 "Click": "Click"
 };

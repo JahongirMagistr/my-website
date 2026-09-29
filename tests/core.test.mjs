@@ -141,3 +141,19 @@ test("rasm manzillari tekshiriladi", async () => {
   await handle(db, "adminUpdateProject", { id: "p_tomato", image: "https://abc.supabase.co/storage/v1/object/public/media/images/a.jpg" }, as("u_admin"));
   assert.match(db.projects.find((p) => p.id === "p_tomato").image, /^https:/);
 });
+
+test("demo ma'lumotlarni o'chirish: haqiqiy ma'lumotlar saqlanadi", async () => {
+  const { db, as } = await setup();
+  const ctx = { hash, issueToken, outbox: [] };
+  const real = (await handle(db, "register", { role: "farmer", name: "Haqiqiy Fermer", email: "real@x.uz", password: "secret1" }, ctx)).user;
+  const { project } = await handle(db, "createProject", { title: "Real", crop: "Karam", region: "Jizzax", goal: 10_000_000, durationMonths: 5, fundingDeadline: "2099-01-01", investorShare: 40 }, as(real.id));
+  await assert.rejects(handle(db, "purgeDemo", {}, as("u_inv1")), /ruxsat/);
+  const r = await handle(db, "purgeDemo", {}, as("u_admin"));
+  assert.ok(r.removed > 20);
+  assert.deepEqual(db.users.map((u) => u.id).sort(), ["u_admin", real.id].sort());
+  assert.deepEqual(db.projects.map((p) => p.id), [project.id]);
+  assert.equal(db.investments.length + db.contracts.length + db.news.length, 0);
+  assert.equal(db.settings.testPayments, false);
+  assert.equal(db.settings.showDemoLogins, false);
+  assert.equal((await handle(db, "bootstrap", {}, {})).stats.totalRaised, 0);
+});

@@ -222,6 +222,7 @@ export async function route() {
     }
     renderChrome();
     renderDemoBanner();
+    if (getMode() === "offline") return renderOffline();
     try {
       await fn(...m.slice(1));
     } catch (e) {
@@ -778,7 +779,8 @@ function pageLogin() {
 }
 
 function demoHint() {
-  if (!state.boot?.projects?.some((p) => p.id === "p_tomato")) return "";
+  const allowed = getMode() === "demo" || state.boot?.settings?.showDemoLogins;
+  if (!allowed || !state.boot?.projects?.some((p) => p.id === "p_tomato")) return "";
   return `<div class="card-flat mt-3 small"><b>${te("Demo hisoblar")}</b> (${te("sinov uchun")}):
     <div class="row mt-1"><button class="btn btn-sm btn-outline" data-demo="investor@agricrowd.uz" data-pw="demo123">${te("Investor")}</button><button class="btn btn-sm btn-outline" data-demo="fermer@agricrowd.uz" data-pw="demo123">${te("Fermer")}</button>${getMode() === "demo" ? `<button class="btn btn-sm btn-outline" data-demo="admin@agricrowd.uz" data-pw="Admin123!">${te("Admin")}</button>` : ""}</div></div>`;
 }
@@ -858,6 +860,15 @@ async function init() {
   setRerender(route);
   window.addEventListener("hashchange", route);
   route();
+}
+
+// Server (/api) ishlamasa — soxta ma'lumot o'rniga aniq xabar
+function renderOffline() {
+  app().innerHTML = `<div class="container section" style="max-width:760px"><div class="card empty">
+    <div class="ico">🛠️</div><h2>${te("Sayt vaqtincha ishlamayapti")}</h2>
+    <p>${te("Server bilan aloqa yo'q. Iltimos, birozdan keyin qayta urinib ko'ring.")}</p>
+    <p class="small muted">${te("Administrator uchun: /api funksiyasi javob bermayapti. Sayt Netlify'ga GitHub orqali (funksiyalar bilan) joylanganini va muhit o'zgaruvchilari to'g'riligini tekshiring.")}</p>
+    <button class="btn" onclick="location.reload()">${te("Yangilash")}</button></div></div>`;
 }
 
 function renderDemoBanner() {

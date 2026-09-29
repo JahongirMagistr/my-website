@@ -8,7 +8,15 @@ const TOKEN_KEY = "agricrowd_token";
 const DEMO_DB_KEY = "agricrowd_demo_db";
 const DEMO_FILE = "agricrowd_file:";
 
-let mode = null; // "server" | "demo"
+let mode = null; // "server" | "demo" | "offline"
+// Brauzer-demo rejimi faqat lokal kompyuterda (yoki ?demo=1 bilan) ishlaydi.
+// Haqiqiy domenda server bo'lmasa, soxta ma'lumot ko'rsatilmaydi — "offline" holati.
+const DEMO_ALLOWED = (() => {
+  try {
+    if (/[?&]demo=1\b/.test(location.search)) localStorage.setItem("agricrowd_allow_demo", "1");
+    return /^(localhost|127\.0\.0\.1|0\.0\.0\.0|)$/.test(location.hostname) || location.protocol === "file:" || localStorage.getItem("agricrowd_allow_demo") === "1";
+  } catch { return false; }
+})();
 let token = safeGet(TOKEN_KEY);
 
 function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
@@ -23,9 +31,9 @@ async function detectMode() {
   try {
     const r = await fetch("/api", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "ping" }) });
     const data = await r.json();
-    mode = r.ok && data.ok ? "server" : "demo";
+    mode = r.ok && data.ok ? "server" : DEMO_ALLOWED ? "demo" : "offline";
   } catch {
-    mode = "demo";
+    mode = DEMO_ALLOWED ? "demo" : "offline";
   }
   return mode;
 }
@@ -88,6 +96,7 @@ const translated = (e) => new ApiError(t(e.message, e.params), e.status, e.param
 
 export async function api(action, payload = {}) {
   await detectMode();
+  if (mode === "offline" && action !== "ping") throw new ApiError(t("Server bilan aloqa yo'q. Internetni tekshiring"), 0);
   if (mode === "demo") {
     try {
       return await demoCall(action, payload);

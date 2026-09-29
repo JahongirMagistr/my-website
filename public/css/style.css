@@ -462,3 +462,4 @@ table.data td:first-child { min-width: 160px; }
 .cstep > div { align-items: flex-start; }
 @media (max-width: 1340px) { .top-mail span { display: none; } }
 .stats-spacer { height: 8px; }
+.danger-zone { border: 1px solid var(--red-100); }

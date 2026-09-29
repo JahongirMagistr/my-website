@@ -416,6 +416,7 @@ const VIEWS = {
         <label class="field">${te("Platforma komissiyasi (investorlar ulushidan, %)")}<input name="commission" type="number" min="0" max="50" step="any" value="${esc(s.commission)}" /></label>
         <label class="field">${te("Minimal investitsiya (so'm)")}<input name="minInvestment" type="number" min="1000" step="any" value="${esc(s.minInvestment)}" /></label>
         <label class="check full"><input type="checkbox" name="showStats" ${s.showStats !== false ? "checked" : ""} /> ${te("Bosh sahifada statistikani ko'rsatish (loyihalar soni, jalb qilingan mablag', investorlar)")}</label>
+        <label class="check full"><input type="checkbox" name="showDemoLogins" ${s.showDemoLogins ? "checked" : ""} /> ${te("Kirish sahifasida demo hisob tugmalarini ko'rsatish")}</label>
         <label class="check full"><input type="checkbox" name="testPayments" ${s.testPayments ? "checked" : ""} /> ${te("Test to'lov rejimi (hisob haqiqiy pulsiz to'ldiriladi — faqat sinov uchun!)")}</label>
       </div></div>
 
@@ -437,7 +438,14 @@ const VIEWS = {
       <div class="form-section"><h3>${te("Ma'lumotnomalar")}</h3><div class="form-grid">
         <label class="field">${te("Hududlar")} <small>(${te("har biri yangi qatorda")})</small><textarea name="regions" style="min-height:220px">${esc(s.regions.join("\n"))}</textarea></label>
         <label class="field">${te("Sabzavot mahsulotlari")} <small>(${te("har biri yangi qatorda")})</small><textarea name="crops" style="min-height:220px">${esc(s.crops.join("\n"))}</textarea></label></div></div>
-      <div class="error-box" data-error hidden></div><div><button class="btn btn-lg">${te("Saqlash")}</button></div></form></div>`;
+      <div class="error-box" data-error hidden></div><div><button class="btn btn-lg">${te("Saqlash")}</button></div></form></div>
+      <div class="card mt-3 danger-zone"><h3>🧹 ${te("Saytni haqiqiy ishga tayyorlash")}</h3>
+        <p class="small">${te("Demo foydalanuvchilar (investor@, malika@, fermer@, dehqon@agricrowd.uz), demo loyihalar, ularning investitsiyalari, shartnomalari, to'lovlari va demo yangiliklar hamma uchun o'chiriladi. Test to'lov rejimi va demo tugmalar o'chiriladi. Siz qo'shgan ma'lumotlar saqlanib qoladi.")}</p>
+        <button class="btn btn-danger" data-purge>${te("Demo ma'lumotlarni o'chirish")}</button></div>`;
+    $("[data-purge]", el).onclick = async (e) => {
+      if (!(await confirmDlg(t("Barcha demo ma'lumotlar o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi. Davom etasizmi?"), { danger: true, ok: t("O'chirish") }))) return;
+      run(e.target, async () => { const r = await api("purgeDemo", {}); toast(t("{n} ta demo yozuv o'chirildi", { n: r.removed })); });
+    };
     const form = $("#set-form", el);
     bindOpen(el);
     $$("[data-lang-tab]", el).forEach((btn) => (btn.onclick = () => {
@@ -469,7 +477,7 @@ const VIEWS = {
     form.onsubmit = (e) => {
       e.preventDefault();
       const d = formData(form);
-      const payload = { commission: d.commission, minInvestment: d.minInvestment, testPayments: d.testPayments, showStats: d.showStats, heroImage: d.heroImage, contactPhone: d.contactPhone, contactEmail: d.contactEmail, address: d.address, telegram: d.telegram, regions: d.regions, crops: d.crops, bank: {}, content: { uz: {}, ru: {}, en: {} } };
+      const payload = { commission: d.commission, minInvestment: d.minInvestment, testPayments: d.testPayments, showStats: d.showStats, showDemoLogins: d.showDemoLogins, heroImage: d.heroImage, contactPhone: d.contactPhone, contactEmail: d.contactEmail, address: d.address, telegram: d.telegram, regions: d.regions, crops: d.crops, bank: {}, content: { uz: {}, ru: {}, en: {} } };
       for (const [k, v] of Object.entries(d)) {
         if (k.startsWith("bank_")) payload.bank[k.slice(5)] = v;
         const m = k.match(/^c_(uz|ru|en)_(\w+)$/);
@@ -494,7 +502,7 @@ const LOG_LABELS = {
   delete_user: "Foydalanuvchini o'chirdi", update_settings: "Sozlamalarni o'zgartirdi", project_funded: "Loyiha 100% moliyalashtirildi", project_refunded: "Mablag' qaytarildi",
   sign_contract: "Shartnomani imzoladi", review_contract: "Shartnomani tekshirdi", funds_released: "Mablag' fermerga ajratildi", release_funds: "Mablag'ni ajratdi",
   set_template: "Shartnoma shablonini yukladi", create_payment: "To'lov yaratdi", attach_receipt: "Chek yukladi", review_payment: "To'lovni tekshirdi",
-  review_withdrawal: "Yechish so'rovini ko'rib chiqdi", save_news: "Yangilikni saqladi", delete_news: "Yangilikni o'chirdi", broadcast: "Xabar yubordi",
+  review_withdrawal: "Yechish so'rovini ko'rib chiqdi", purge_demo: "Demo ma'lumotlarni o'chirdi", save_news: "Yangilikni saqladi", delete_news: "Yangilikni o'chirdi", broadcast: "Xabar yubordi",
 };
 function logTable(logs) {
   if (!logs.length) return `<p class="muted">${te("Yozuvlar yo'q")}</p>`;

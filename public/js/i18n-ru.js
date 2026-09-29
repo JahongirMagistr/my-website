@@ -996,6 +996,16 @@ export default {
 "Click orqali to'lov": "Оплата через Click",
 "To'lov bekor qilindi (Payme)": "Платёж отменён (Payme)",
 "Bosh sahifada statistikani ko'rsatish (loyihalar soni, jalb qilingan mablag', investorlar)": "Показывать статистику на главной (число проектов, привлечённые средства, инвесторы)",
+"Sayt vaqtincha ishlamayapti": "Сайт временно недоступен",
+"Server bilan aloqa yo'q. Iltimos, birozdan keyin qayta urinib ko'ring.": "Нет связи с сервером. Пожалуйста, попробуйте чуть позже.",
+"Administrator uchun: /api funksiyasi javob bermayapti. Sayt Netlify'ga GitHub orqali (funksiyalar bilan) joylanganini va muhit o'zgaruvchilari to'g'riligini tekshiring.": "Для администратора: функция /api не отвечает. Проверьте, что сайт развёрнут на Netlify через GitHub (вместе с функциями) и переменные окружения заданы верно.",
+"Kirish sahifasida demo hisob tugmalarini ko'rsatish": "Показывать кнопки демо-аккаунтов на странице входа",
+"Saytni haqiqiy ishga tayyorlash": "Подготовка сайта к реальной работе",
+"Demo foydalanuvchilar (investor@, malika@, fermer@, dehqon@agricrowd.uz), demo loyihalar, ularning investitsiyalari, shartnomalari, to'lovlari va demo yangiliklar hamma uchun o'chiriladi. Test to'lov rejimi va demo tugmalar o'chiriladi. Siz qo'shgan ma'lumotlar saqlanib qoladi.": "Демо-пользователи (investor@, malika@, fermer@, dehqon@agricrowd.uz), демо-проекты, их инвестиции, договоры, платежи и демо-новости будут удалены для всех. Тестовые платежи и демо-кнопки отключатся. Добавленные вами данные сохранятся.",
+"Demo ma'lumotlarni o'chirish": "Удалить демо-данные",
+"Barcha demo ma'lumotlar o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi. Davom etasizmi?": "Все демо-данные будут удалены. Это действие нельзя отменить. Продолжить?",
+"{n} ta demo yozuv o'chirildi": "Удалено демо-записей: {n}",
+"Demo ma'lumotlarni o'chirdi": "Удалил демо-данные",
 "Payme": "Payme",
 "Click": "Click"
 };

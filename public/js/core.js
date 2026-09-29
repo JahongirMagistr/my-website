@@ -48,6 +48,7 @@ export const DEFAULT_SETTINGS = {
   commission: 5, // platforma komissiyasi, investorlar ulushidan %
   minInvestment: 500000,
   showStats: true, // bosh sahifada statistika ko'rsatilsinmi
+  showDemoLogins: false, // kirish sahifasida demo hisob tugmalari
   testPayments: false, // test rejimida hisob darhol to'ldiriladi (haqiqiy pulsiz)
   regions: [
     "Andijon", "Buxoro", "Farg'ona", "Jizzax", "Xorazm", "Namangan", "Navoiy",
@@ -1156,6 +1157,27 @@ const ACTIONS = {
     return { ok: true };
   },
 
+  // Barcha demo ma'lumotlarni (seed) o'chirish — sayt haqiqiy ishga tushganda
+  purgeDemo(db, _p, ctx) {
+    const a = requireUser(ctx, ["admin"]);
+    const users = new Set(DEMO_USER_IDS);
+    const projects = new Set(db.projects.filter((p) => DEMO_PROJECT_IDS.includes(p.id) || users.has(p.farmerId)).map((p) => p.id));
+    const before = COLLECTIONS.reduce((s, c) => s + db[c].length, 0);
+    const byUser = (x) => users.has(x.userId) || users.has(x.investorId) || users.has(x.farmerId);
+    db.users = db.users.filter((u) => !users.has(u.id));
+    db.projects = db.projects.filter((p) => !projects.has(p.id));
+    for (const c of ["investments", "updates", "contracts", "transactions"]) db[c] = db[c].filter((x) => !projects.has(x.projectId) && !byUser(x));
+    for (const c of ["payments", "withdrawals", "notifications", "messages"]) db[c] = db[c].filter((x) => !byUser(x));
+    db.news = db.news.filter((n) => !DEMO_NEWS_TITLES.includes(n.title));
+    db.logs = db.logs.filter((l) => !users.has(l.userId));
+    db.settings.testPayments = false;
+    db.settings.showDemoLogins = false;
+    if (db.settings.bank?.account === DEMO_BANK.account) db.settings.bank = { ...DEFAULT_SETTINGS.bank };
+    const removed = before - COLLECTIONS.reduce((s, c) => s + db[c].length, 0);
+    log(db, a.id, "purge_demo", String(removed));
+    return { removed };
+  },
+
   // Yangiliklar
   saveNews(db, { id, title, body, image, published }, ctx) {
     const a = requireUser(ctx, ["admin"]);
@@ -1205,6 +1227,7 @@ const ACTIONS = {
     if ("minInvestment" in payload) s.minInvestment = Math.max(1000, round(payload.minInvestment));
     if ("testPayments" in payload) s.testPayments = !!payload.testPayments;
     if ("showStats" in payload) s.showStats = !!payload.showStats;
+    if ("showDemoLogins" in payload) s.showDemoLogins = !!payload.showDemoLogins;
     for (const k of ["contactPhone", "contactEmail", "address", "telegram"]) if (k in payload) s[k] = str(payload[k], 300);
     if ("heroImage" in payload) s.heroImage = safeImg(payload.heroImage);
     if (payload.bank) s.bank = { ...s.bank, ...Object.fromEntries(Object.entries(payload.bank).map(([k, v]) => [k, str(v, 300)])) };
@@ -1240,7 +1263,8 @@ export async function seed(db, { hash, adminEmail, adminPassword, demo = true })
   await mkUser({ id: "u_admin", role: "admin", name: "Platforma administratori", email: adminEmail, phone: "" }, adminPassword);
   if (!demo) return db;
   db.settings.testPayments = true;
-  db.settings.bank = { ...db.settings.bank, recipient: "«Agricrowd» MChJ", bankName: "«Agrobank» ATB", account: "20208000900000000001", mfo: "00394", inn: "300000000" };
+  db.settings.showDemoLogins = true;
+  db.settings.bank = { ...db.settings.bank, ...DEMO_BANK };
 
   const inv1 = await mkUser({ id: "u_inv1", role: "investor", name: "Aziz Karimov", email: "investor@agricrowd.uz", phone: "+998 90 111 22 33", balance: 25_000_000, bank: { holder: "Aziz Karimov", bankName: "Kapitalbank", account: "", mfo: "", card: "8600123412341234" }, docs: { passport: "AA1234567", pinfl: "", address: "Toshkent sh.", birthDate: "" } }, "demo123");
   const inv2 = await mkUser({ id: "u_inv2", role: "investor", name: "Malika Yusupova", email: "malika@agricrowd.uz", phone: "+998 93 222 33 44", balance: 12_000_000 }, "demo123");
@@ -1351,3 +1375,9 @@ export async function seed(db, { hash, adminEmail, adminPassword, demo = true })
   );
   return db;
 }
+
+// Demo (seed) yozuvlarini aniqlash uchun
+const DEMO_USER_IDS = ["u_inv1", "u_inv2", "u_farm1", "u_farm2"];
+const DEMO_PROJECT_IDS = ["p_tomato", "p_potato", "p_cucumber", "p_onion", "p_carrot"];
+const DEMO_NEWS_TITLES = ["Agricrowd.uz platformasi ishga tushdi", "«Piyoz yetishtirish va saqlash» loyihasi muvaffaqiyatli yakunlandi"];
+const DEMO_BANK = { recipient: "«Agricrowd» MChJ", bankName: "«Agrobank» ATB", account: "20208000900000000001", mfo: "00394", inn: "300000000" };

@@ -1,0 +1,22 @@
+{
+  "name": "agricrowd-uz",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agricrowd.uz — sabzavot yetishtirish loyihalarini moliyalashtirish (kraudfanding) platformasi",
+  "type": "module",
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "i18n:check": "node scripts/i18n-check.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^11.1.1",
+    "@supabase/supabase-js": "^2.117.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "pg": "^8.23.0"
+  }
+}

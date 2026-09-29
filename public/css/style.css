@@ -46,7 +46,6 @@ p { margin: 0 0 1em; }
 .row.between { justify-content: space-between; }
 .grow { flex: 1; }
 
-.demo-banner { background: var(--sun-100); color: #7a5200; font-size: .875rem; text-align: center; padding: 6px 16px; }
 
 /* Buttons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: 10px; font: inherit; font-weight: 700; font-size: .95rem; border: 1.5px solid transparent; cursor: pointer; background: var(--green-700); color: #fff; transition: background .15s, transform .05s; white-space: nowrap; }

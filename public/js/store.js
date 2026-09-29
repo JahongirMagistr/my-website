@@ -9,14 +9,10 @@ const DEMO_DB_KEY = "agricrowd_demo_db";
 const DEMO_FILE = "agricrowd_file:";
 
 let mode = null; // "server" | "demo" | "offline"
-// Brauzer-demo rejimi faqat lokal kompyuterda (yoki ?demo=1 bilan) ishlaydi.
+// Brauzer-demo rejimi faqat lokal kompyuterda ishlaydi.
 // Haqiqiy domenda server bo'lmasa, soxta ma'lumot ko'rsatilmaydi — "offline" holati.
-const DEMO_ALLOWED = (() => {
-  try {
-    if (/[?&]demo=1\b/.test(location.search)) localStorage.setItem("agricrowd_allow_demo", "1");
-    return /^(localhost|127\.0\.0\.1|0\.0\.0\.0|)$/.test(location.hostname) || location.protocol === "file:" || localStorage.getItem("agricrowd_allow_demo") === "1";
-  } catch { return false; }
-})();
+const DEMO_ALLOWED = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|)$/.test(location.hostname) || location.protocol === "file:";
+try { localStorage.removeItem("agricrowd_allow_demo"); } catch { /* ignore */ }
 let token = safeGet(TOKEN_KEY);
 
 function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }

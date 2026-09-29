@@ -221,7 +221,7 @@ Barcha muhit o'zgaruvchilari:
 Dasturchilar uchun:
 ```bash
 npm install
-npm run dev              # http://localhost:8888 (ma'lumotlar .data/ da; ?demo=1 — brauzer demo rejimi)
+npm run dev              # http://localhost:8888 (ma'lumotlar .data/ da)
 npm test                 # TEST_DATABASE_URL=postgres://... — PostgreSQL testlari ham
 npm run i18n:check       # tarjimasi yo'q matnlar
 ```

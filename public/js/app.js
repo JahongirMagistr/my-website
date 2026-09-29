@@ -1,5 +1,5 @@
 // Agricrowd.uz — asosiy ilova: sarlavha, marshrutlash, ommaviy sahifalar, kirish/ro'yxatdan o'tish
-import { api, getMode, setToken, hasToken, resetDemo, openFile } from "./store.js";
+import { api, getMode, setToken, hasToken, openFile } from "./store.js";
 import { STATUSES } from "./core.js";
 import { t, tv, tc, LANGS, getLang, setLang, flagSvg, contentText } from "./i18n.js";
 import {
@@ -223,7 +223,6 @@ export async function route() {
       }).catch(() => {});
     }
     renderChrome();
-    renderDemoBanner();
     if (getMode() === "offline") return renderOffline();
     try {
       await fn(...m.slice(1));
@@ -923,18 +922,6 @@ function renderOffline() {
     <p>${te("Server bilan aloqa yo'q. Iltimos, birozdan keyin qayta urinib ko'ring.")}</p>
     <p class="small muted">${te("Administrator uchun: /api funksiyasi javob bermayapti. Sayt Netlify'ga GitHub orqali (funksiyalar bilan) joylanganini va muhit o'zgaruvchilari to'g'riligini tekshiring.")}</p>
     <button class="btn" onclick="location.reload()">${te("Yangilash")}</button></div></div>`;
-}
-
-function renderDemoBanner() {
-  if (getMode() === "demo") {
-    const b = $("#demo-banner");
-    b.hidden = false;
-    b.innerHTML = `${te("Demo rejim: server ulanmagan, ma'lumotlar faqat shu brauzerda saqlanadi.")} <a href="#" data-reset>${te("Demo ma'lumotlarni tiklash")}</a>`;
-    $("[data-reset]", b).onclick = async (e) => {
-      e.preventDefault();
-      if (await confirmDlg(t("Barcha demo ma'lumotlar boshlang'ich holatga qaytariladi."))) { resetDemo(); location.hash = "#/"; location.reload(); }
-    };
-  }
 }
 
 init();
